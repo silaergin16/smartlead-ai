@@ -1,0 +1,968 @@
+```html
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Transilation</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #F7F6F2;
+            color: #1B2A4A;
+        }
+
+        header {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 7%;
+            border-bottom: 1px solid #ddd;
+            background: #F7F6F2;
+        }
+
+        .logo {
+            font-size: 25px;
+            font-weight: 700;
+            letter-spacing: 3px;
+        }
+
+        nav {
+            display: flex;
+            gap: 30px;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #1B2A4A;
+            font-size: 15px;
+        }
+
+        nav a:hover {
+            opacity: 0.65;
+        }
+
+        .hero {
+            min-height: 620px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 80px 20px;
+        }
+
+        .hero-content {
+            max-width: 900px;
+        }
+
+        .hero h1 {
+            font-size: clamp(45px, 7vw, 82px);
+            line-height: 1;
+            margin: 0 0 30px;
+            font-weight: 500;
+            letter-spacing: -3px;
+        }
+
+        .hero p {
+            max-width: 680px;
+            margin: auto;
+            font-size: 18px;
+            line-height: 1.8;
+            color: #4d5667;
+        }
+
+        .hero-button {
+            display: inline-block;
+            margin-top: 35px;
+            padding: 15px 30px;
+            background: #1B2A4A;
+            color: white;
+            text-decoration: none;
+            border-radius: 2px;
+        }
+
+        section {
+            padding: 100px 7%;
+        }
+
+        .section-title {
+            font-size: 42px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .section-intro {
+            max-width: 700px;
+            line-height: 1.8;
+            color: #596171;
+            margin-bottom: 55px;
+        }
+
+        .audience-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+        }
+
+        .audience-card {
+            min-height: 300px;
+            border: 1px solid #d8d7d2;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            background: #F7F6F2;
+        }
+
+        .number {
+            font-size: 13px;
+            margin-bottom: auto;
+            color: #777;
+        }
+
+        .audience-card h3 {
+            font-size: 25px;
+            font-weight: 500;
+            margin: 0 0 15px;
+        }
+
+        .audience-card p {
+            color: #626978;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .network {
+            background: #1B2A4A;
+            color: white;
+        }
+
+        .network .section-intro {
+            color: #dce1ea;
+        }
+
+        .network-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1px;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .network-item {
+            min-height: 260px;
+            padding: 40px;
+            background: #1B2A4A;
+        }
+
+        .network-item span {
+            font-size: 13px;
+            opacity: 0.65;
+        }
+
+        .network-item h3 {
+            font-size: 28px;
+            font-weight: 400;
+            margin-top: 60px;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 25px;
+        }
+
+        .step {
+            border-top: 1px solid #1B2A4A;
+            padding-top: 20px;
+        }
+
+        .step-number {
+            font-size: 14px;
+            margin-bottom: 45px;
+        }
+
+        .step h3 {
+            font-size: 22px;
+            font-weight: 500;
+        }
+
+        .step p {
+            color: #626978;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .services {
+            background: #e9e8e2;
+        }
+
+        .services-content {
+            max-width: 850px;
+        }
+
+        .services h2 {
+            font-size: clamp(40px, 6vw, 75px);
+            font-weight: 400;
+            line-height: 1;
+            margin: 0 0 30px;
+        }
+
+        .services p {
+            color: #555e6d;
+            line-height: 1.8;
+            max-width: 650px;
+        }
+
+        .service-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 35px;
+        }
+
+        .button-dark,
+        .button-light {
+            padding: 15px 25px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .button-dark {
+            background: #1B2A4A;
+            color: white;
+        }
+
+        .button-light {
+            border: 1px solid #1B2A4A;
+            color: #1B2A4A;
+        }
+
+        footer {
+            padding: 35px 7%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            border-top: 1px solid #ddd;
+        }
+
+
+        /* =====================================
+           AKILLI SATIŞ ASİSTANI
+        ===================================== */
+
+        #assistant-button {
+
+            position: fixed;
+
+            right: 25px;
+
+            bottom: 25px;
+
+            width: 62px;
+
+            height: 62px;
+
+            border-radius: 50%;
+
+            border: none;
+
+            background: #1B2A4A;
+
+            color: white;
+
+            font-size: 25px;
+
+            cursor: pointer;
+
+            box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+
+            z-index: 9999;
+
+        }
+
+
+        #assistant-window {
+
+            display: none;
+
+            position: fixed;
+
+            right: 25px;
+
+            bottom: 100px;
+
+            width: 380px;
+
+            height: 560px;
+
+            background: #F7F6F2;
+
+            border: 1px solid #ddd;
+
+            box-shadow: 0 10px 35px rgba(0,0,0,0.25);
+
+            z-index: 9998;
+
+            overflow: hidden;
+
+        }
+
+
+        #assistant-header {
+
+            height: 60px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            padding: 0 18px;
+
+            background: #1B2A4A;
+
+            color: white;
+
+            font-weight: bold;
+
+        }
+
+
+        #assistant-close {
+
+            border: none;
+
+            background: transparent;
+
+            color: white;
+
+            font-size: 20px;
+
+            cursor: pointer;
+
+        }
+
+
+        #assistant-frame {
+
+            width: 100%;
+
+            height: calc(100% - 60px);
+
+            border: none;
+
+        }
+
+
+        @media (max-width: 900px) {
+
+            .audience-grid,
+            .steps {
+
+                grid-template-columns: repeat(2, 1fr);
+
+            }
+
+        }
+
+
+        @media (max-width: 600px) {
+
+            header {
+                padding: 0 5%;
+            }
+
+            nav {
+                gap: 12px;
+            }
+
+            nav a {
+                font-size: 12px;
+            }
+
+            section {
+                padding: 70px 5%;
+            }
+
+            .audience-grid,
+            .steps,
+            .network-grid {
+
+                grid-template-columns: 1fr;
+
+            }
+
+            .service-buttons {
+                flex-direction: column;
+            }
+
+            footer {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+
+            #assistant-window {
+
+                right: 10px;
+
+                bottom: 85px;
+
+                width: calc(100% - 20px);
+
+                height: 520px;
+
+            }
+
+
+            #assistant-button {
+
+                right: 15px;
+
+                bottom: 15px;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================
+     HEADER
+===================================== -->
+
+<header>
+
+    <div class="logo">
+        TRANSILATION
+    </div>
+
+    <nav>
+
+        <a href="/">
+            Ana Sayfa
+        </a>
+
+        <a href="/discover">
+            Edebiyat
+        </a>
+
+        <a href="/translate">
+            Çeviri
+        </a>
+
+        <a href="/discover">
+            Topluluk
+        </a>
+
+    </nav>
+
+</header>
+
+
+
+<!-- =====================================
+     HERO
+===================================== -->
+
+<section class="hero">
+
+    <div class="hero-content">
+
+        <h1>
+            Okuma Rotanızı Belirleyin
+        </h1>
+
+        <p>
+
+            Edebiyatı farklı diller, farklı seviyeler ve farklı
+            okuma deneyimleri üzerinden keşfedin.
+
+            Transilation, okurlar, çevirmenler ve edebiyat
+            tutkunları için yeni nesil bir okuma ve çeviri alanı oluşturur.
+
+        </p>
+
+
+        <a class="hero-button" href="/discover">
+
+            Edebiyatı Keşfet
+
+        </a>
+
+    </div>
+
+</section>
+
+
+
+<!-- =====================================
+     KİMLER İÇİN?
+===================================== -->
+
+<section>
+
+    <div class="section-title">
+
+        Kimler İçin?
+
+    </div>
+
+
+    <p class="section-intro">
+
+        Transilation farklı okuma deneyimlerine ve dil seviyelerine
+        sahip kullanıcıları bir araya getirir.
+
+    </p>
+
+
+    <div class="audience-grid">
+
+
+        <div class="audience-card">
+
+            <div class="number">
+                01
+            </div>
+
+            <h3>
+                Yeni Başlayan Okurlar
+            </h3>
+
+            <p>
+
+                Başlangıç ve orta seviye için Türkçe destekli
+                paralel metinlerle yabancı dili gerçek hikâyeler
+                üzerinden keşfedin.
+
+            </p>
+
+        </div>
+
+
+
+        <div class="audience-card">
+
+            <div class="number">
+                02
+            </div>
+
+            <h3>
+                İki Dilli Okurlar
+            </h3>
+
+            <p>
+
+                Orijinal metin ile Türkçe çeviri arasındaki
+                anlamsal köprüleri keşfedin.
+
+            </p>
+
+        </div>
+
+
+
+        <div class="audience-card">
+
+            <div class="number">
+                03
+            </div>
+
+            <h3>
+                Edebiyat Tutkunları
+            </h3>
+
+            <p>
+
+                Eserleri, yazarları ve çevirileri akademik ve
+                entelektüel bir perspektifle keşfedin.
+
+            </p>
+
+        </div>
+
+
+
+        <div class="audience-card">
+
+            <div class="number">
+                04
+            </div>
+
+            <h3>
+                Çevirmenler
+            </h3>
+
+            <p>
+
+                Çeviri süreçlerini, farklı yaklaşımları ve
+                edebi metinleri inceleyerek yeni bağlantılar kurun.
+
+            </p>
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+
+<!-- =====================================
+     AĞ
+===================================== -->
+
+<section class="network">
+
+    <div class="section-title">
+
+        Yeni Nesil Okur ve Çevirmen Ağı
+
+    </div>
+
+
+    <p class="section-intro">
+
+        Okuma, çeviri ve edebiyat deneyimini tek bir dijital
+        ortamda bir araya getiriyoruz.
+
+    </p>
+
+
+    <div class="network-grid">
+
+
+        <div class="network-item">
+
+            <span>
+                01
+            </span>
+
+            <h3>
+                Oku
+            </h3>
+
+        </div>
+
+
+        <div class="network-item">
+
+            <span>
+                02
+            </span>
+
+            <h3>
+                Karşılaştır
+            </h3>
+
+        </div>
+
+
+        <div class="network-item">
+
+            <span>
+                03
+            </span>
+
+            <h3>
+                Keşfet
+            </h3>
+
+        </div>
+
+
+        <div class="network-item">
+
+            <span>
+                04
+            </span>
+
+            <h3>
+                Paylaş
+            </h3>
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+
+<!-- =====================================
+     TRANSILATION İLE
+===================================== -->
+
+<section>
+
+    <div class="section-title">
+
+        Transilation ile
+
+    </div>
+
+
+    <div class="steps">
+
+
+        <div class="step">
+
+            <div class="step-number">
+                01
+            </div>
+
+            <h3>
+                Kendini Tanıt
+            </h3>
+
+            <p>
+
+                Okuma alışkanlıklarını, yabancı dil seviyeni
+                ve edebiyat ilgi alanlarını seç.
+
+            </p>
+
+        </div>
+
+
+
+        <div class="step">
+
+            <div class="step-number">
+                02
+            </div>
+
+            <h3>
+                Edebiyatı Keşfet
+            </h3>
+
+            <p>
+
+                İlgi alanlarına ve dil seviyene uygun eserleri,
+                yazarları ve çevirileri keşfet.
+
+            </p>
+
+        </div>
+
+
+
+        <div class="step">
+
+            <div class="step-number">
+                03
+            </div>
+
+            <h3>
+                İstediğin Şekilde Oku
+            </h3>
+
+            <p>
+
+                Eserleri Türkçe, orijinal dilinde veya iki dili
+                karşılaştırarak oku.
+
+            </p>
+
+        </div>
+
+
+
+        <div class="step">
+
+            <div class="step-number">
+                04
+            </div>
+
+            <h3>
+                Topluluğa Katıl
+            </h3>
+
+            <p>
+
+                Okudukların hakkında düşüncelerini paylaş,
+                diğer okurlarla etkileşime geç.
+
+            </p>
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+
+<!-- =====================================
+     ÇEVİRİ HİZMETLERİ
+===================================== -->
+
+<section class="services">
+
+    <div class="services-content">
+
+        <h2>
+
+            TUTARLI<br>
+            ÇEVİRİ ÇÖZÜMLERİ
+
+        </h2>
+
+
+        <p>
+
+            Profesyonel çeviri çözümleriyle dijital ve basılı
+            içeriklerinizi dünyaya taşıyoruz.
+
+            Transilation, çevirmenlerin ve okuyucuların
+            arayüzünü modern, güvenilir ve etkileyici bir
+            ortama dönüştürüyor.
+
+        </p>
+
+
+        <div class="service-buttons">
+
+            <a href="/translate" class="button-dark">
+
+                Çeviri Aracını Kullan
+
+            </a>
+
+
+            <a href="/discover" class="button-light">
+
+                Eserleri Keşfet
+
+            </a>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- =====================================
+     FOOTER
+===================================== -->
+
+<footer>
+
+    <div>
+
+        © 2026 TRANSILATION
+
+    </div>
+
+
+    <div>
+
+        Okur • Çevirmen • Edebiyat
+
+    </div>
+
+</footer>
+
+
+
+<!-- =====================================
+     AKILLI SATIŞ ASİSTANI
+===================================== -->
+
+<button
+    id="assistant-button"
+    onclick="toggleAssistant()">
+
+    💬
+
+</button>
+
+
+
+<div id="assistant-window">
+
+
+    <div id="assistant-header">
+
+        <span>
+            Transilation Akıllı Asistan
+        </span>
+
+
+        <button
+            id="assistant-close"
+            onclick="toggleAssistant()">
+
+            ×
+
+        </button>
+
+    </div>
+
+
+    <iframe
+        id="assistant-frame"
+        src="/assistant">
+    </iframe>
+
+
+</div>
+
+
+
+<script>
+
+function toggleAssistant() {
+
+    const assistant =
+        document.getElementById("assistant-window");
+
+
+    if (
+        assistant.style.display === "none" ||
+        assistant.style.display === ""
+    ) {
+
+        assistant.style.display = "block";
+
+    }
+
+    else {
+
+        assistant.style.display = "none";
+
+    }
+
+}
+
+</script>
+
+
+</body>
+
+</html>
+```

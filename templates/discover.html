@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edebiyatı Keşfet | Transilation</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #F7F6F2;
+            color: #1B2A4A;
+        }
+
+        header {
+            background: #1B2A4A;
+            padding: 22px 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        header a {
+            color: white;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 60px 30px;
+        }
+
+        h1 {
+            font-size: 42px;
+            margin-bottom: 15px;
+        }
+
+        .intro {
+            color: #666;
+            max-width: 700px;
+            line-height: 1.7;
+            margin-bottom: 40px;
+        }
+
+        .filters {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: end;
+            margin-bottom: 45px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .filter-group label {
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        select {
+            padding: 11px 14px;
+            border: 1px solid #ddd;
+            border-radius: 7px;
+            background: white;
+            color: #333;
+            min-width: 150px;
+        }
+
+        .filter-button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 7px;
+            background: #1B2A4A;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .filter-button:hover {
+            opacity: 0.9;
+        }
+
+        .books {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+        }
+
+        .book {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .book:hover {
+            transform: translateY(-4px);
+        }
+
+        .book h2 {
+            margin-top: 0;
+            font-size: 23px;
+        }
+
+        .author {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .book-info {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .tag {
+            background: #E9E7E1;
+            color: #1B2A4A;
+            padding: 6px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        .detail-button {
+            display: inline-block;
+            padding: 11px 18px;
+            background: #1B2A4A;
+            color: white;
+            text-decoration: none;
+            border-radius: 7px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .detail-button:hover {
+            opacity: 0.9;
+        }
+
+        #no-results {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+        }
+
+        footer {
+            background: #1B2A4A;
+            color: white;
+            text-align: center;
+            padding: 30px;
+            margin-top: 70px;
+        }
+
+        @media (max-width: 850px) {
+            .books {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                padding: 20px;
+            }
+
+            .container {
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+
+    <div class="logo">
+        TRANSILATION
+    </div>
+
+    <a href="/">
+        Ana Sayfa
+    </a>
+
+</header>
+
+
+<main class="container">
+
+    <h1>
+        Edebiyatı Keşfet
+    </h1>
+
+    <p class="intro">
+        Dünya edebiyatından eserleri keşfedin, dil seviyenize ve
+        ilgi alanlarınıza uygun kitapları bulun ve eserleri
+        orijinal diliyle veya Türkçe çevirisiyle okuyun.
+    </p>
+
+
+    <section class="filters">
+
+        <div class="filter-group">
+
+            <label for="language">
+                Dil
+            </label>
+
+            <select id="language">
+
+                <option value="İngilizce">
+                    İngilizce
+                </option>
+
+                <option value="Fransızca">
+                    Fransızca
+                </option>
+
+                <option value="Almanca">
+                    Almanca
+                </option>
+
+                <option value="İspanyolca">
+                    İspanyolca
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="filter-group">
+
+            <label for="level">
+                Dil Seviyesi
+            </label>
+
+            <select id="level">
+
+                <option value="A1">
+                    A1
+                </option>
+
+                <option value="A2">
+                    A2
+                </option>
+
+                <option value="B1">
+                    B1
+                </option>
+
+                <option value="B2" selected>
+                    B2
+                </option>
+
+                <option value="C1">
+                    C1
+                </option>
+
+                <option value="C2">
+                    C2
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="filter-group">
+
+            <label for="genre">
+                Tür
+            </label>
+
+            <select id="genre">
+
+                <option value="Roman">
+                    Roman
+                </option>
+
+                <option value="Öykü">
+                    Öykü
+                </option>
+
+                <option value="Şiir">
+                    Şiir
+                </option>
+
+                <option value="Tiyatro">
+                    Tiyatro
+                </option>
+
+                <option value="Deneme">
+                    Deneme
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <button
+            class="filter-button"
+            onclick="filterBooks()">
+
+            Kitapları Keşfet
+
+        </button>
+
+    </section>
+
+
+    <section class="books">
+
+
+        <!-- JANE EYRE -->
+
+        <div
+            class="book"
+            data-language="İngilizce"
+            data-level="B2"
+            data-genre="Roman">
+
+            <h2>
+                Jane Eyre
+            </h2>
+
+            <div class="author">
+                Charlotte Brontë
+            </div>
+
+            <div class="book-info">
+
+                <span class="tag">
+                    İngilizce
+                </span>
+
+                <span class="tag">
+                    B2
+                </span>
+
+                <span class="tag">
+                    Roman
+                </span>
+
+            </div>
+
+            <a
+                href="/book/jane-eyre"
+                class="detail-button">
+
+                Eseri İncele
+
+            </a>
+
+        </div>
+
+
+        <!-- THE GREAT GATSBY -->
+
+        <div
+            class="book"
+            data-language="İngilizce"
+            data-level="B2"
+            data-genre="Roman">
+
+            <h2>
+                The Great Gatsby
+            </h2>
+
+            <div class="author">
+                F. Scott Fitzgerald
+            </div>
+
+            <div class="book-info">
+
+                <span class="tag">
+                    İngilizce
+                </span>
+
+                <span class="tag">
+                    B2
+                </span>
+
+                <span class="tag">
+                    Roman
+                </span>
+
+            </div>
+
+            <a
+                href="/book/great-gatsby"
+                class="detail-button">
+
+                Eseri İncele
+
+            </a>
+
+        </div>
+
+
+        <!-- A ROOM OF ONE'S OWN -->
+
+        <div
+            class="book"
+            data-language="İngilizce"
+            data-level="C1"
+            data-genre="Deneme">
+
+            <h2>
+                A Room of One's Own
+            </h2>
+
+            <div class="author">
+                Virginia Woolf
+            </div>
+
+            <div class="book-info">
+
+                <span class="tag">
+                    İngilizce
+                </span>
+
+                <span class="tag">
+                    C1
+                </span>
+
+                <span class="tag">
+                    Deneme
+                </span>
+
+            </div>
+
+            <a
+                href="/book/room-of-ones-own"
+                class="detail-button">
+
+                Eseri İncele
+
+            </a>
+
+        </div>
+
+
+    </section>
+
+
+    <div id="no-results">
+
+        Bu seçimlere uygun bir eser henüz bulunamadı.
+
+    </div>
+
+</main>
+
+
+<footer>
+
+    © 2026 Transilation
+
+</footer>
+
+
+<script>
+
+function filterBooks() {
+
+    const language =
+        document.getElementById("language").value;
+
+    const level =
+        document.getElementById("level").value;
+
+    const genre =
+        document.getElementById("genre").value;
+
+
+    const books =
+        document.querySelectorAll(".book");
+
+
+    let visibleBooks = 0;
+
+
+    books.forEach(function(book) {
+
+        const bookLanguage =
+            book.dataset.language;
+
+        const bookLevel =
+            book.dataset.level;
+
+        const bookGenre =
+            book.dataset.genre;
+
+
+        if (
+            bookLanguage === language &&
+            bookLevel === level &&
+            bookGenre === genre
+        ) {
+
+            book.style.display = "block";
+
+            visibleBooks++;
+
+        } else {
+
+            book.style.display = "none";
+
+        }
+
+    });
+
+
+    const noResults =
+        document.getElementById("no-results");
+
+
+    if (visibleBooks === 0) {
+
+        noResults.style.display = "block";
+
+    } else {
+
+        noResults.style.display = "none";
+
+    }
+
+}
+
+</script>
+
+</body>
+</html>

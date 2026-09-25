@@ -1,32 +1,20 @@
 from flask import Flask
 from flask_cors import CORS
 
-from config import DevelopmentConfig
-from app.database import init_db
+from config import config_by_name
+from app.database import close_db, init_db
 
 
-def create_app():
-    app = Flask(
-        __name__,
-        template_folder="../templates"
-    )
+def create_app(config_name="development"):
+    app = Flask(__name__, template_folder="templates")
+    app.config.from_object(config_by_name[config_name])
 
-    app.config.from_object(DevelopmentConfig)
+    CORS(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})
 
-    CORS(
-        app,
-        resources={
-            r"/api/*": {
-                "origins": "*",
-                "methods": ["GET", "POST", "OPTIONS"],
-                "allow_headers": ["Content-Type"]
-            }
-        }
-    )
+    app.teardown_appcontext(close_db)
+    init_db(app)
 
-    from app.routes import main
-    app.register_blueprint(main)
-
-    init_db()
+    from app.routes import bp
+    app.register_blueprint(bp)
 
     return app

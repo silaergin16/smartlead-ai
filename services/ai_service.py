@@ -12,7 +12,7 @@ class AIService:
         api_key = os.getenv("GEMINI_API_KEY")
         if api_key:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel("gemini-2.0-flash")
+            self.model = self._get_active_model()
         else:
             self.model = None
 
@@ -20,6 +20,30 @@ class AIService:
             "BUSINESS_CONTEXT",
             "Sen Transilation şirketinin akıllı satış asistanısın. Çeviri hizmetleri hakkında kibar, profesyonel ve yönlendirici Türkçe bilgiler ver, kullanıcıyı teklif almaya yönlendir."
         )
+
+    def _get_active_model(self):
+        try:
+            available_models = [
+                model.name
+                for model in genai.list_models()
+                if "generateContent" in model.supported_generation_methods
+            ]
+
+            preferred_models = [
+                "models/gemini-1.5-flash",
+                "models/gemini-1.5-pro",
+                "models/gemini-pro",
+            ]
+            for preferred_model in preferred_models:
+                if preferred_model in available_models:
+                    return genai.GenerativeModel(preferred_model)
+
+            if available_models:
+                return genai.GenerativeModel(available_models[0])
+        except Exception:
+            pass
+
+        return genai.GenerativeModel("gemini-1.5-flash")
 
     def generate_response(self, mesaj, gecmis=None):
         if not self.model:

@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, render_template, request
 
 from app.database import lead_ekle, tum_leadler
-from services.ai_service import AIServiceError, ai_service
+from app.services.ai_service import AIServiceError, ai_service
 
 
 bp = Blueprint("routes", __name__)

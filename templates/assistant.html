@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Transilation - Akıllı Asistan</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #F7F6F2;
+            color: #1B2A4A;
+        }
+
+        header {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 7%;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 3px;
+        }
+
+        .back {
+            text-decoration: none;
+            color: #1B2A4A;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 70px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+
+        .intro {
+            color: #626978;
+            line-height: 1.7;
+            margin-bottom: 35px;
+        }
+
+        .chat-box {
+            background: white;
+            border: 1px solid #ddd;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            min-height: 350px;
+        }
+
+        .message {
+            max-width: 75%;
+            padding: 14px 18px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+
+        .bot {
+            background: #eef0f4;
+            color: #1B2A4A;
+        }
+
+        .user {
+            background: #1B2A4A;
+            color: white;
+            margin-left: auto;
+        }
+
+        .options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 0 25px 20px;
+        }
+
+        .option {
+            border: 1px solid #1B2A4A;
+            background: white;
+            color: #1B2A4A;
+            padding: 11px 15px;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        .option:hover {
+            background: #1B2A4A;
+            color: white;
+        }
+
+        .input-area {
+            display: flex;
+            border-top: 1px solid #ddd;
+        }
+
+        #messageInput {
+            flex: 1;
+            border: none;
+            padding: 18px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        #sendButton {
+            border: none;
+            background: #1B2A4A;
+            color: white;
+            padding: 0 25px;
+            cursor: pointer;
+        }
+
+        #sendButton:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .lead-form {
+            display: block;
+            padding: 25px;
+            border-top: 1px solid #ddd;
+            background: #fafafa;
+        }
+
+        .lead-form h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        .lead-form p {
+            color: #626978;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .lead-form input,
+        .lead-form textarea {
+            width: 100%;
+            padding: 13px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .lead-form textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        #leadButton {
+            margin-top: 12px;
+            border: none;
+            background: #1B2A4A;
+            color: white;
+            padding: 13px 20px;
+            cursor: pointer;
+        }
+
+        #leadButton:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #leadMessage {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #777;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+
+    <div class="logo">
+        TRANSILATION
+    </div>
+
+    <a href="/" class="back">
+        ← Ana Sayfa
+    </a>
+
+</header>
+
+
+<div class="container">
+
+    <h1>Akıllı Satış Asistanı</h1>
+
+    <p class="intro">
+        Transilation hizmetleri hakkında bilgi almak,
+        ihtiyacınıza uygun çözümü bulmak veya edebiyat dünyasını
+        keşfetmek için size yardımcı olabilirim.
+    </p>
+
+
+    <div class="chat-box">
+
+        <div class="messages" id="messages">
+
+            <div class="message bot">
+                Merhaba! Ben Transilation'ın Akıllı Satış Asistanıyım.
+                Size nasıl yardımcı olabilirim?
+            </div>
+
+        </div>
+
+
+        <div class="options" id="options">
+
+            <button
+                class="option"
+                onclick="sendOption('Çeviri hizmeti almak istiyorum')">
+                Çeviri hizmeti almak istiyorum
+            </button>
+
+            <button
+                class="option"
+                onclick="sendOption('Edebiyat keşfetmek istiyorum')">
+                Edebiyat keşfetmek istiyorum
+            </button>
+
+            <button
+                class="option"
+                onclick="sendOption('Profesyonel çeviri hakkında bilgi almak istiyorum')">
+                Profesyonel çeviri
+            </button>
+
+            <button
+                class="option"
+                onclick="sendOption('Çevirmen olarak başvurmak istiyorum')">
+                Çevirmen olarak başvurmak istiyorum
+            </button>
+
+        </div>
+
+
+        <div class="lead-form" id="leadForm">
+
+            <h3>Teklif almak ister misiniz?</h3>
+
+            <p>
+                Size uygun bir teklif hazırlayabilmemiz için
+                iletişim bilgilerinizi bırakabilirsiniz.
+            </p>
+
+            <input
+                type="text"
+                id="leadName"
+                placeholder="Adınız"
+            >
+
+            <input
+                type="tel"
+                id="leadPhone"
+                placeholder="Telefon numaranız"
+            >
+
+            <textarea
+                id="leadRequest"
+                placeholder="Çeviri talebiniz"
+            ></textarea>
+
+            <button
+                id="leadButton"
+                onclick="submitLead()">
+                Teklif Talebi Gönder
+            </button>
+
+            <div id="leadMessage"></div>
+
+        </div>
+
+
+        <div class="input-area">
+
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="Mesajınızı yazın..."
+                onkeydown="handleEnter(event)"
+            >
+
+            <button
+                id="sendButton"
+                onclick="sendMessage()">
+                Gönder
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<footer>
+
+    © 2026 Transilation
+
+</footer>
+
+
+<script>
+
+let conversationHistory = [];
+
+
+function addMessage(text, type) {
+
+    const messages = document.getElementById("messages");
+
+    const message = document.createElement("div");
+
+    message.className = "message " + type;
+
+    message.textContent = text;
+
+    messages.appendChild(message);
+
+    messages.scrollTop = messages.scrollHeight;
+}
+
+
+function addToHistory(role, content) {
+
+    conversationHistory.push({
+        role: role,
+        content: content
+    });
+
+}
+
+
+async function sendOption(text) {
+
+    addMessage(text, "user");
+
+    addToHistory("user", text);
+
+    const input = document.getElementById("messageInput");
+
+    input.value = "";
+
+    const sendButton = document.getElementById("sendButton");
+
+    sendButton.disabled = true;
+
+
+    try {
+
+        const response = await fetch("/api/sohbet", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+
+                message: text,
+
+                history: conversationHistory.slice(0, -1)
+
+            })
+
+        });
+
+
+        const data = await response.json();
+
+
+        if (data.success) {
+
+            addMessage(data.response, "bot");
+
+            addToHistory("assistant", data.response);
+
+        } else {
+
+            addMessage(
+                "Üzgünüm, şu anda bir sorun oluştu.",
+                "bot"
+            );
+
+        }
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        addMessage(
+            "Sunucuya bağlanırken bir hata oluştu.",
+            "bot"
+        );
+
+    }
+
+
+    sendButton.disabled = false;
+
+    input.focus();
+
+}
+
+
+async function sendMessage() {
+
+    const input = document.getElementById("messageInput");
+
+    const text = input.value.trim();
+
+    if (!text) {
+        return;
+    }
+
+    await sendOption(text);
+
+}
+
+
+function handleEnter(event) {
+
+    if (event.key === "Enter") {
+
+        sendMessage();
+
+    }
+
+}
+
+
+async function submitLead() {
+
+    const name = document.getElementById("leadName").value.trim();
+
+    const phone = document.getElementById("leadPhone").value.trim();
+
+    const message = document.getElementById("leadRequest").value.trim();
+
+    const leadMessage = document.getElementById("leadMessage");
+
+    const leadButton = document.getElementById("leadButton");
+
+
+    if (!name) {
+
+        leadMessage.textContent = "Lütfen adınızı girin.";
+
+        return;
+
+    }
+
+
+    if (!phone) {
+
+        leadMessage.textContent = "Lütfen telefon numaranızı girin.";
+
+        return;
+
+    }
+
+
+    leadButton.disabled = true;
+
+    leadMessage.textContent = "Gönderiliyor...";
+
+
+    try {
+
+        const response = await fetch("/api/leads", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+
+                name: name,
+
+                phone: phone,
+
+                message: message
+
+            })
+
+        });
+
+
+        const data = await response.json();
+
+
+        if (data.success) {
+
+            leadMessage.textContent =
+                "Bilgileriniz başarıyla alındı. En kısa sürede sizinle iletişime geçeceğiz.";
+
+            document.getElementById("leadName").value = "";
+
+            document.getElementById("leadPhone").value = "";
+
+            document.getElementById("leadRequest").value = "";
+
+            addMessage(
+                "Teşekkür ederim! İletişim bilgileriniz başarıyla alındı.",
+                "bot"
+            );
+
+        } else {
+
+            leadMessage.textContent =
+                data.error || "Bilgiler kaydedilemedi.";
+
+        }
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        leadMessage.textContent =
+            "Sunucuya bağlanırken bir hata oluştu.";
+
+    }
+
+
+    leadButton.disabled = false;
+
+}
+
+</script>
+
+</body>
+
+</html>

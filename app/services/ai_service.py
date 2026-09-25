@@ -251,7 +251,7 @@ Kısa ve doğal Türkçe cevap ver.
         try:
 
             response = self.client.models.generate_content(
-                model="gemini-3.6-flash",
+                model="gemini-3.8-flash",
                 contents=prompt
             )
 

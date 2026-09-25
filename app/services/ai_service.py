@@ -20,108 +20,105 @@ class AIService:
         conversation_history = conversation_history or []
 
         # -------------------------------------------------
-        # KONUŞMA GEÇMİŞİNİ ANALİZ ET
+        # TÜM KONUŞMAYI BİRLEŞTİR
         # -------------------------------------------------
 
-        all_messages = []
+        all_text = []
 
         for item in conversation_history:
             content = item.get("content", "").strip()
 
             if content:
-                all_messages.append(content)
+                all_text.append(content)
 
-        # Şu anki mesajı da ekle
-        all_messages.append(user_message)
+        all_text.append(user_message)
 
-        full_text = " ".join(all_messages).lower()
+        full_text = " ".join(all_text).lower()
 
         # -------------------------------------------------
-        # KELİME / SAYFA SAYISI VERİLDİYSE
+        # KONUŞMADA GERÇEKTEN KELİME/SAYFA SAYISI VAR MI?
         # -------------------------------------------------
 
-        has_quantity = any(
-            word in full_text
-            for word in [
-                "kelime",
-                "sayfa",
-                "word"
-            ]
+        import re
+
+        has_quantity = bool(
+            re.search(
+                r"\b\d+\s*(kelime|word|sayfa)\b",
+                full_text
+            )
         )
 
+        # Örneğin:
+        # 3000 kelime
+        # 10 sayfa
+        # 2500 word
+
         # -------------------------------------------------
-        # TESLİM TARİHİ HENÜZ VERİLMEDİYSE
+        # TESLİM TARİHİ VAR MI?
         # -------------------------------------------------
 
-        delivery_words = [
-            "gün",
-            "hafta",
-            "yarın",
-            "bugün",
-            "teslim",
-            "cuma",
-            "cumartesi",
-            "pazar",
-            "pazartesi",
-            "salı",
-            "çarşamba",
-            "perşembe",
-            "nisan",
-            "mayıs",
-            "haziran",
-            "temmuz",
-            "ağustos",
-            "eylül",
-            "ekim",
-            "kasım",
-            "aralık"
+        delivery_patterns = [
+            r"\b\d+\s*gün\b",
+            r"\b\d+\s*hafta\b",
+            r"\byarın\b",
+            r"\bbugün\b",
+            r"\bhaftaya\b",
+            r"\bbu hafta\b",
+            r"\bgelecek hafta\b",
+            r"\bcuma\b",
+            r"\bcumartesi\b",
+            r"\bpazar\b",
+            r"\bpazartesi\b",
+            r"\bsalı\b",
+            r"\bçarşamba\b",
+            r"\bperşembe\b",
         ]
 
         has_delivery_date = any(
-            word in full_text
-            for word in delivery_words
+            re.search(pattern, full_text)
+            for pattern in delivery_patterns
         )
 
         # -------------------------------------------------
-        # KELİME SAYISI VERİLDİYSE VE TESLİM TARİHİ YOKSA
-        # GEMINI'YE BAĞLI KALMADAN DOĞRU CEVABI VER
+        # KAYNAK VE HEDEF DİL
         # -------------------------------------------------
 
-        if has_quantity and not has_delivery_date:
-
-            return (
-                "Anladım. Çeviri metninizin yaklaşık "
-                "kelime/sayfa sayısını not aldım. "
-                "Çevirinin teslim edilmesini istediğiniz "
-                "bir tarih var mı?"
-            )
+        has_source_target = (
+            "ingilizce" in full_text
+            and "türkçe" in full_text
+        )
 
         # -------------------------------------------------
-        # KAYNAK + HEDEF + METİN TÜRÜ VARSA
-        # KELİME SAYISINI SOR
+        # METİN TÜRÜ
         # -------------------------------------------------
 
-        has_english = "ingilizce" in full_text
-        has_turkish = "türkçe" in full_text
+        text_types = [
+            "akademik",
+            "hukuki",
+            "teknik",
+            "edebi",
+            "ticari",
+            "makale",
+            "tez",
+            "belge"
+        ]
 
         has_text_type = any(
             word in full_text
-            for word in [
-                "akademik",
-                "hukuki",
-                "teknik",
-                "edebi",
-                "ticari",
-                "web sitesi",
-                "makale",
-                "tez",
-                "belge"
-            ]
+            for word in text_types
         )
 
+        # -------------------------------------------------
+        # 1. AŞAMA
+        #
+        # Kaynak + hedef + metin türü var,
+        # ama kelime sayısı yok.
+        #
+        # SADECE KELİME SAYISINI SOR.
+        # -------------------------------------------------
+
         if (
-            has_english
-            and has_turkish
+            has_source_target
             and has_text_type
             and not has_quantity
         ):
@@ -133,11 +130,38 @@ class AIService:
             )
 
         # -------------------------------------------------
-        # GEREKLİ BİLGİLER TAMAMSA
-        # TEKLİF AL BÖLÜMÜNE YÖNLENDİR
+        # 2. AŞAMA
+        #
+        # Kelime sayısı var,
+        # teslim tarihi yok.
+        #
+        # SADECE TESLİM TARİHİNİ SOR.
         # -------------------------------------------------
 
-        if has_quantity and has_delivery_date:
+        if (
+            has_quantity
+            and not has_delivery_date
+        ):
+
+            return (
+                "Anladım. Çeviri metninizin yaklaşık "
+                "kelime/sayfa sayısını not aldım. "
+                "Çevirinin teslim edilmesini istediğiniz "
+                "bir tarih var mı?"
+            )
+
+        # -------------------------------------------------
+        # 3. AŞAMA
+        #
+        # Kelime sayısı + teslim tarihi var.
+        #
+        # TEKLİF AL'A YÖNLENDİR.
+        # -------------------------------------------------
+
+        if (
+            has_quantity
+            and has_delivery_date
+        ):
 
             return (
                 "Harika! Çeviri yönü, metin türü, "
@@ -148,11 +172,10 @@ class AIService:
             )
 
         # -------------------------------------------------
-        # GEMINI YOKSA FALLBACK
+        # GEMINI YOKSA
         # -------------------------------------------------
 
         if not self.client:
-
             return self.fallback_response(user_message)
 
         # -------------------------------------------------
@@ -170,7 +193,7 @@ KONUŞMA KURALLARI:
 
 1. Türkçe, doğal, kısa ve profesyonel konuş.
 
-2. Konuşma geçmişindeki bilgileri hatırla.
+2. Önceki mesajlarda verilen bilgileri hatırla.
 
 3. Kullanıcının daha önce verdiği bilgileri tekrar sorma.
 
@@ -187,7 +210,7 @@ hepsini dikkate al.
 
 6. Gereksiz soru sorma.
 
-7. Mümkünse her mesajda yalnızca BİR soru sor.
+7. Mümkünse yalnızca BİR soru sor.
 
 8. Fiyat sorulursa kesin veya uydurma fiyat verme.
 
@@ -199,17 +222,15 @@ tekrar isteme.
 
 11. Kısa cevaplar ver.
 
-Şimdi konuşma geçmişini ve kullanıcının son mesajını
-dikkatlice değerlendir.
 """
 
         # -------------------------------------------------
-        # GEÇMİŞİ GEMINI'YE GÖNDER
+        # KONUŞMA GEÇMİŞİ
         # -------------------------------------------------
 
         if conversation_history:
 
-            prompt += "\n\n--- KONUŞMA GEÇMİŞİ ---\n"
+            prompt += "\n--- KONUŞMA GEÇMİŞİ ---\n"
 
             for item in conversation_history:
 
@@ -220,13 +241,11 @@ dikkatlice değerlendir.
                     continue
 
                 if role == "user":
-
                     prompt += (
                         f"KULLANICI: {content}\n"
                     )
 
                 elif role == "assistant":
-
                     prompt += (
                         f"ASİSTAN: {content}\n"
                     )
@@ -242,8 +261,6 @@ KULLANICININ SON MESAJI:
 ÖNEMLİ:
 
 Önceki konuşmada verilmiş bilgileri tekrar sorma.
-
-Kullanıcının ihtiyacını dikkate al.
 
 Eksik olan en önemli bilgiyi belirle.
 
@@ -264,7 +281,6 @@ Kısa ve doğal Türkçe cevap ver.
             )
 
             if response and response.text:
-
                 return response.text.strip()
 
             return self.fallback_response(
@@ -309,6 +325,8 @@ Kısa ve doğal Türkçe cevap ver.
         conversation_history=None
     ):
 
+        import re
+
         history = conversation_history or []
 
         combined = " ".join(
@@ -321,14 +339,14 @@ Kısa ve doğal Türkçe cevap ver.
 
         text = combined.lower()
 
-        if any(
-            word in text
-            for word in [
-                "kelime",
-                "sayfa",
-                "word"
-            ]
-        ):
+        has_quantity = bool(
+            re.search(
+                r"\b\d+\s*(kelime|word|sayfa)\b",
+                text
+            )
+        )
+
+        if has_quantity:
 
             return (
                 "Anladım. Çeviri metninizin yaklaşık "
@@ -350,21 +368,6 @@ Kısa ve doğal Türkçe cevap ver.
                 "Harika! İngilizce → Türkçe akademik "
                 "çeviri için metniniz yaklaşık kaç kelime "
                 "veya kaç sayfa?"
-            )
-
-        if any(
-            word in text
-            for word in [
-                "teklif",
-                "fiyat",
-                "ücret"
-            ]
-        ):
-
-            return (
-                "Size uygun bir teklif hazırlayabilmemiz için "
-                "çeviri yönü, metin türü, yaklaşık kelime sayısı "
-                "ve teslim süresini öğrenmemiz gerekiyor."
             )
 
         return (

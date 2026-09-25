@@ -2,7 +2,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from config import config_by_name
-from app.database import close_db, init_db
+from app.database import init_db
 
 
 def create_app(config_name="development"):
@@ -11,8 +11,7 @@ def create_app(config_name="development"):
 
     CORS(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})
 
-    app.teardown_appcontext(close_db)
-    init_db(app)
+    init_db()
 
     from app.routes import bp
     app.register_blueprint(bp)

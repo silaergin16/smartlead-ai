@@ -1,54 +1,86 @@
+import os
 import sqlite3
 
-from flask import current_app, g
+
+BASE_DIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
+
+DATABASE_PATH = os.path.join(
+    BASE_DIR,
+    "transilation.db"
+)
 
 
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(
-            current_app.config["DATABASE_URL"],
-            detect_types=sqlite3.PARSE_DECLTYPES
+def get_connection():
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def init_db():
+    connection = get_connection()
+
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-        g.db.row_factory = sqlite3.Row
-    return g.db
+    """)
+
+    connection.commit()
+    connection.close()
 
 
-def close_db(error=None):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
+def create_lead(name, phone, message):
+    connection = get_connection()
 
-
-def init_db(app):
-    with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS leads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                isim TEXT NOT NULL,
-                telefon TEXT NOT NULL,
-                mesaj TEXT,
-                tarih DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        db.commit()
-
-
-def lead_ekle(isim: str, telefon: str, mesaj: str = "") -> int:
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute(
-        "INSERT INTO leads (isim, telefon, mesaj) VALUES (?, ?, ?)",
-        (isim, telefon, mesaj)
+    cursor = connection.execute(
+        """
+        INSERT INTO leads (name, phone, message)
+        VALUES (?, ?, ?)
+        """,
+        (name, phone, message)
     )
-    db.commit()
-    return cursor.lastrowid
+
+    connection.commit()
+    lead_id = cursor.lastrowid
+    connection.close()
+
+    return lead_id
 
 
-def tum_leadler() -> list:
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT id, isim, telefon, mesaj, tarih FROM leads ORDER BY tarih DESC")
-    rows = cursor.fetchall()
-    return [dict(row) for row in rows]
+def get_leads():
+    connection = get_connection()
+
+    leads = connection.execute(
+        """
+        SELECT id, name, phone, message, created_at
+        FROM leads
+        ORDER BY created_at DESC
+        """
+    ).fetchall()
+
+    connection.close()
+
+    return [dict(lead) for lead in leads]
+
+
+def lead_ekle(isim, telefon, mesaj=""):
+    return create_lead(isim, telefon, mesaj)
+
+
+def tum_leadler():
+    return [
+        {
+            "id": lead["id"],
+            "isim": lead["name"],
+            "telefon": lead["phone"],
+            "mesaj": lead["message"],
+            "tarih": lead["created_at"],
+        }
+        for lead in get_leads()
+    ]

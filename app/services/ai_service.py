@@ -1,7 +1,6 @@
 from google import genai
 
 from config import Config
-
 from app.database import create_lead
 
 
@@ -14,146 +13,152 @@ class AIService:
         self.client = None
 
         if self.api_key:
-
             self.client = genai.Client(
                 api_key=self.api_key
             )
+
 
     def get_response(self, user_message, conversation_history=None):
 
         if not self.client:
             return self.fallback_response(user_message)
 
-        prompt = Config.BUSINESS_CONTEXT + "\n\n"
 
-        prompt += """
+        conversation_history = conversation_history or []
+
+
+        prompt = Config.BUSINESS_CONTEXT + """
+
 SEN TRANSILATION'IN AKILLI SATIŞ ASİSTANISIN.
 
-Görevin, kullanıcıların çeviri ihtiyaçlarını anlamak ve
-onları teklif alma sürecine yönlendirmektir.
+Kullanıcının çeviri ihtiyacını anlamak ve teklif sürecine
+yönlendirmek için yardımcı oluyorsun.
 
-KURALLAR:
+KONUŞMA KURALLARI:
 
-1. Türkçe, doğal, samimi ve profesyonel konuş.
+1. Türkçe, doğal, kısa ve profesyonel konuş.
 
-2. Kullanıcının mesajında verdiği bilgileri dikkatlice analiz et.
+2. Kullanıcının daha önce verdiği bilgileri HATIRLA.
 
-3. Kullanıcı bir bilgiyi zaten söylediyse ASLA tekrar sorma.
+3. Kullanıcı bir bilgiyi zaten verdiyse ASLA tekrar sorma.
 
-4. Aşağıdaki bilgileri mümkün olduğunca konuşma sırasında topla:
+4. Özellikle şu bilgileri takip et:
 
 - Kaynak dil
 - Hedef dil
 - Metin türü
-- Yaklaşık kelime veya sayfa sayısı
+- Kelime veya sayfa sayısı
 - Teslim tarihi
 
-5. Kullanıcı aynı mesajda birden fazla bilgi verirse hepsini
-hatırla ve tekrar sorma.
+5. Kullanıcı aynı mesajda birden fazla bilgi verdiyse
+hepsini aynı anda hatırla.
 
-ÖRNEK:
-Kullanıcı:
+6. Örneğin kullanıcı:
+
 "İngilizceden Türkçeye akademik çeviri istiyorum."
 
-Burada zaten:
-- Kaynak dil: İngilizce
-- Hedef dil: Türkçe
-- Metin türü: Akademik
+derse şu bilgiler zaten bellidir:
 
-bilgileri verilmiştir.
+Kaynak dil = İngilizce
+Hedef dil = Türkçe
+Metin türü = Akademik
 
-Bu nedenle tekrar "Hangi dilden hangi dile?" veya
-"Metninizin türü nedir?" diye SORMA.
+Bu bilgileri tekrar sorma.
 
-Bunun yerine:
+Bunun yerine yalnızca eksik olan bir sonraki önemli bilgiyi sor.
+
+Örneğin:
+
 "Harika! Metniniz yaklaşık kaç kelime veya kaç sayfa?"
-gibi eksik olan bir sonraki bilgiyi sor.
 
-6. Kullanıcı kelime sayısını bilmiyorsa yaklaşık sayfa sayısını sor.
+7. Kullanıcı:
 
-7. Kullanıcı teslim tarihini söylediyse tekrar sorma.
+"3000 kelime"
 
-8. Her mesajda mümkünse yalnızca BİR soru sor.
+derse kelime sayısının 3000 olduğunu hatırla.
 
-9. Kullanıcı fiyat veya teklif sorarsa kesin fiyat uydurma.
-Fiyatın dil çifti, metin türü, kelime sayısı ve teslim süresine
-göre belirlendiğini belirt.
+Önceki bilgilerle birlikte düşün:
 
-10. Kullanıcı teklif almak istediğini açıkça söylerse,
-Wix'teki "Teklif Al" bölümünden iletişim bilgilerini
-bırakabileceğini söyle.
+Kaynak = İngilizce
+Hedef = Türkçe
+Tür = Akademik
+Kelime = 3000
 
-11. Gereksiz kişisel bilgi isteme.
+Bu durumda kaynak dili, hedef dili veya metin türünü
+TEKRAR SORMA.
 
-12. Kullanıcı adını veya telefonunu konuşmada kendisi verirse
-bunu tekrar isteme.
+Bunun yerine teslim tarihini sor:
 
-13. Kısa ve anlaşılır cevaplar ver.
+"Anladım. Çevirinin teslim edilmesini istediğiniz bir tarih var mı?"
 
-14. Önceki konuşmadaki bilgileri kullan ve kullanıcıya
-aynı soruları tekrar sorma.
+8. Kullanıcı teslim tarihini de verdiyse artık gerekli bilgilerin
+tamamlandığını belirt ve "Teklif Al" bölümüne yönlendir.
 
-KONUŞMA ÖRNEĞİ:
+9. Her mesajda mümkünse yalnızca BİR soru sor.
 
-Kullanıcı:
-"İngilizceden Türkçeye akademik çeviri istiyorum."
+10. Kullanıcı fiyat sorarsa kesin veya uydurma bir fiyat verme.
 
-Asistan:
-"Harika! İngilizce → Türkçe akademik çeviri için
-metniniz yaklaşık kaç kelime veya kaç sayfa?"
+11. Kullanıcı teklif almak istediğini söylerse
+"Teklif Al" bölümünden iletişim bilgilerini bırakabileceğini söyle.
 
-Kullanıcı:
-"3000 kelime."
+12. Kullanıcı adını veya telefonunu konuşma içinde kendisi verirse
+tekrar isteme.
 
-Asistan:
-"Anladım. Peki çevirinin teslim edilmesini istediğiniz
-bir tarih var mı?"
+13. Gereksiz kişisel bilgi isteme.
 
-Kullanıcı:
-"3 gün içinde."
+14. Kullanıcıyla konuşurken önceki mesajları dikkate al.
 
-Asistan:
-"Harika, ihtiyacınızı not aldım. Size uygun teklif
-almak için 'Teklif Al' bölümünden iletişim bilgilerinizi
-bırakabilirsiniz."
+15. Kısa cevaplar ver.
 
-Bu örnekteki mantığı kullan fakat cevapları kullanıcının
-mesajına göre doğal şekilde oluştur.
+ŞİMDİ AŞAĞIDAKİ KONUŞMA GEÇMİŞİNİ DİKKATLİCE İNCELE.
 """
 
-        prompt += "\n\n"
-
+        # Konuşma geçmişini açık ve düzenli şekilde ekle
         if conversation_history:
 
-            prompt += "ÖNCEKİ KONUŞMA:\n"
+            prompt += "\n\n--- KONUŞMA GEÇMİŞİ ---\n"
 
-            for message in conversation_history:
+            for item in conversation_history:
 
-                role = message.get("role", "user")
-                content = message.get("content", "")
+                role = item.get("role", "")
+                content = item.get("content", "")
 
-                prompt += f"{role}: {content}\n"
+                if not content:
+                    continue
 
-            prompt += "\n"
+                if role == "user":
+                    prompt += f"KULLANICI: {content}\n"
+
+                elif role == "assistant":
+                    prompt += f"ASİSTAN: {content}\n"
+
+            prompt += "\n--- KONUŞMA GEÇMİŞİ SONU ---\n"
+
 
         prompt += f"""
-KULLANICININ YENİ MESAJI:
+
+KULLANICININ ŞU ANKİ MESAJI:
 
 {user_message}
 
 ÖNEMLİ:
-Kullanıcının yeni mesajındaki bilgileri önceki konuşmayla
-birlikte değerlendir.
 
-Zaten verilmiş bilgileri tekrar sorma.
+Önce konuşma geçmişini incele.
 
-Eksik olan en önemli BİR sonraki bilgiyi sor.
+Kullanıcının daha önce verdiği bilgileri çıkar.
 
-Kullanıcı teklif almak istiyorsa uygun şekilde "Teklif Al"
-bölümüne yönlendir.
+Bu bilgilerden hiçbirini tekrar sorma.
 
-Şimdi doğal ve kısa bir cevap ver.
+Eksik olan en önemli bilgiyi belirle.
+
+Mümkünse yalnızca BİR soru sor.
+
+Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
+"Teklif Al" bölümüne yönlendir.
+
+Şimdi kullanıcıya doğal ve kısa bir Türkçe cevap ver.
 """
+
 
         try:
 
@@ -162,13 +167,27 @@ bölümüne yönlendir.
                 contents=prompt
             )
 
-            return response.text
+            if response and response.text:
+
+                return response.text.strip()
+
+            return (
+                "Anladım. Çeviri talebinizle ilgili "
+                "bir sonraki bilgiyi paylaşabilir misiniz?"
+            )
+
 
         except Exception as error:
 
-            print(f"Gemini API Error: {error}")
+            print(
+                f"Gemini API Error: {type(error).__name__}: {error}",
+                flush=True
+            )
 
-            return self.fallback_response(user_message)
+            return self.context_fallback(
+                user_message,
+                conversation_history
+            )
 
 
     def save_lead(self, name, phone, message):
@@ -183,39 +202,94 @@ bölümüne yönlendir.
         )
 
 
-    def fallback_response(self, user_message):
+    def context_fallback(
+        self,
+        user_message,
+        conversation_history=None
+    ):
 
-        message = user_message.lower()
+        """
+        Gemini geçici olarak hata verirse bile
+        konuşmanın mantığını koruyan basit fallback.
+        """
 
-        if any(word in message for word in [
-            "çeviri",
-            "çevir",
-            "translate"
-        ]):
+        history = conversation_history or []
+
+        combined = " ".join(
+            item.get("content", "")
+            for item in history
+            if item.get("content")
+        )
+
+        combined += " " + user_message
+
+        text = combined.lower()
+
+
+        # Kelime sayısı verildiyse teslim tarihini sor
+        if any(
+            word in text
+            for word in [
+                "kelime",
+                "sayfa",
+                "word"
+            ]
+        ):
 
             return (
-                "Harika! Çeviri hizmetiniz için size yardımcı "
-                "olabilirim. Metniniz yaklaşık kaç kelime veya "
-                "kaç sayfa?"
+                "Anladım. Çeviri metninizin yaklaşık "
+                "kelime/sayfa sayısını not aldım. "
+                "Çevirinin teslim edilmesini istediğiniz "
+                "bir tarih var mı?"
             )
 
-        if any(word in message for word in [
-            "teklif",
-            "fiyat",
-            "ücret"
-        ]):
+
+        # Çeviri bilgileri varsa kelime sayısını sor
+        if (
+            "ingilizce" in text
+            and "türkçe" in text
+            and (
+                "akademik" in text
+                or "çeviri" in text
+            )
+        ):
+
+            return (
+                "Harika! İngilizce → Türkçe akademik "
+                "çeviri için metniniz yaklaşık kaç kelime "
+                "veya kaç sayfa?"
+            )
+
+
+        if any(
+            word in text
+            for word in [
+                "teklif",
+                "fiyat",
+                "ücret"
+            ]
+        ):
 
             return (
                 "Size uygun bir teklif hazırlayabilmemiz için "
-                "çeviri yönünü, metin türünü ve yaklaşık "
-                "kelime sayısını öğrenmemiz gerekiyor."
+                "çeviri yönü, metin türü, yaklaşık kelime sayısı "
+                "ve teslim süresini öğrenmemiz gerekiyor."
             )
+
 
         return (
             "Merhaba! 👋 Ben Transilation'ın Akıllı Satış "
             "Asistanıyım. Çeviri ihtiyacınızı belirlemenize "
             "ve teklif sürecine yardımcı olabilirim. "
             "Nasıl bir çeviriye ihtiyacınız var?"
+        )
+
+
+    def fallback_response(self, user_message):
+
+        return self.context_fallback(
+            user_message,
+            []
         )
 
 

@@ -362,4 +362,8 @@ Kısa ve doğal Türkçe cevap ver.
         )
 
 
+    def yanit_uret(self, user_message, conversation_history=None):
+        return self.get_response(user_message, conversation_history)
+
+
 ai_service = AIService()

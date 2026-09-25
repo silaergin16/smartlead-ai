@@ -7,9 +7,7 @@ from app.database import create_lead
 class AIService:
 
     def __init__(self):
-
         self.api_key = Config.GEMINI_API_KEY
-
         self.client = None
 
         if self.api_key:
@@ -17,32 +15,166 @@ class AIService:
                 api_key=self.api_key
             )
 
-
     def get_response(self, user_message, conversation_history=None):
-
-        if not self.client:
-            return self.fallback_response(user_message)
-
 
         conversation_history = conversation_history or []
 
+        # -------------------------------------------------
+        # KONUŞMA GEÇMİŞİNİ ANALİZ ET
+        # -------------------------------------------------
+
+        all_messages = []
+
+        for item in conversation_history:
+            content = item.get("content", "").strip()
+
+            if content:
+                all_messages.append(content)
+
+        # Şu anki mesajı da ekle
+        all_messages.append(user_message)
+
+        full_text = " ".join(all_messages).lower()
+
+        # -------------------------------------------------
+        # KELİME / SAYFA SAYISI VERİLDİYSE
+        # -------------------------------------------------
+
+        has_quantity = any(
+            word in full_text
+            for word in [
+                "kelime",
+                "sayfa",
+                "word"
+            ]
+        )
+
+        # -------------------------------------------------
+        # TESLİM TARİHİ HENÜZ VERİLMEDİYSE
+        # -------------------------------------------------
+
+        delivery_words = [
+            "gün",
+            "hafta",
+            "yarın",
+            "bugün",
+            "teslim",
+            "cuma",
+            "cumartesi",
+            "pazar",
+            "pazartesi",
+            "salı",
+            "çarşamba",
+            "perşembe",
+            "nisan",
+            "mayıs",
+            "haziran",
+            "temmuz",
+            "ağustos",
+            "eylül",
+            "ekim",
+            "kasım",
+            "aralık"
+        ]
+
+        has_delivery_date = any(
+            word in full_text
+            for word in delivery_words
+        )
+
+        # -------------------------------------------------
+        # KELİME SAYISI VERİLDİYSE VE TESLİM TARİHİ YOKSA
+        # GEMINI'YE BAĞLI KALMADAN DOĞRU CEVABI VER
+        # -------------------------------------------------
+
+        if has_quantity and not has_delivery_date:
+
+            return (
+                "Anladım. Çeviri metninizin yaklaşık "
+                "kelime/sayfa sayısını not aldım. "
+                "Çevirinin teslim edilmesini istediğiniz "
+                "bir tarih var mı?"
+            )
+
+        # -------------------------------------------------
+        # KAYNAK + HEDEF + METİN TÜRÜ VARSA
+        # KELİME SAYISINI SOR
+        # -------------------------------------------------
+
+        has_english = "ingilizce" in full_text
+        has_turkish = "türkçe" in full_text
+
+        has_text_type = any(
+            word in full_text
+            for word in [
+                "akademik",
+                "hukuki",
+                "teknik",
+                "edebi",
+                "ticari",
+                "web sitesi",
+                "makale",
+                "tez",
+                "belge"
+            ]
+        )
+
+        if (
+            has_english
+            and has_turkish
+            and has_text_type
+            and not has_quantity
+        ):
+
+            return (
+                "Harika! İngilizce → Türkçe akademik "
+                "çeviri için metniniz yaklaşık kaç kelime "
+                "veya kaç sayfa?"
+            )
+
+        # -------------------------------------------------
+        # GEREKLİ BİLGİLER TAMAMSA
+        # TEKLİF AL BÖLÜMÜNE YÖNLENDİR
+        # -------------------------------------------------
+
+        if has_quantity and has_delivery_date:
+
+            return (
+                "Harika! Çeviri yönü, metin türü, "
+                "metin uzunluğu ve teslim süresini "
+                "aldım. Size özel teklif almak için "
+                "\"Teklif Al\" bölümünden iletişim "
+                "bilgilerinizi bırakabilirsiniz."
+            )
+
+        # -------------------------------------------------
+        # GEMINI YOKSA FALLBACK
+        # -------------------------------------------------
+
+        if not self.client:
+
+            return self.fallback_response(user_message)
+
+        # -------------------------------------------------
+        # GEMINI PROMPT
+        # -------------------------------------------------
 
         prompt = Config.BUSINESS_CONTEXT + """
 
 SEN TRANSILATION'IN AKILLI SATIŞ ASİSTANISIN.
 
-Kullanıcının çeviri ihtiyacını anlamak ve teklif sürecine
-yönlendirmek için yardımcı oluyorsun.
+Kullanıcının çeviri ihtiyacını anlamasına ve teklif
+sürecine yönlendirilmesine yardımcı ol.
 
 KONUŞMA KURALLARI:
 
 1. Türkçe, doğal, kısa ve profesyonel konuş.
 
-2. Kullanıcının daha önce verdiği bilgileri HATIRLA.
+2. Konuşma geçmişindeki bilgileri hatırla.
 
-3. Kullanıcı bir bilgiyi zaten verdiyse ASLA tekrar sorma.
+3. Kullanıcının daha önce verdiği bilgileri tekrar sorma.
 
-4. Özellikle şu bilgileri takip et:
+4. Şu bilgileri takip et:
 
 - Kaynak dil
 - Hedef dil
@@ -51,69 +183,30 @@ KONUŞMA KURALLARI:
 - Teslim tarihi
 
 5. Kullanıcı aynı mesajda birden fazla bilgi verdiyse
-hepsini aynı anda hatırla.
+hepsini dikkate al.
 
-6. Örneğin kullanıcı:
+6. Gereksiz soru sorma.
 
-"İngilizceden Türkçeye akademik çeviri istiyorum."
+7. Mümkünse her mesajda yalnızca BİR soru sor.
 
-derse şu bilgiler zaten bellidir:
+8. Fiyat sorulursa kesin veya uydurma fiyat verme.
 
-Kaynak dil = İngilizce
-Hedef dil = Türkçe
-Metin türü = Akademik
+9. Gerekli bilgiler tamamlandığında kullanıcıyı
+"Teklif Al" bölümüne yönlendir.
 
-Bu bilgileri tekrar sorma.
-
-Bunun yerine yalnızca eksik olan bir sonraki önemli bilgiyi sor.
-
-Örneğin:
-
-"Harika! Metniniz yaklaşık kaç kelime veya kaç sayfa?"
-
-7. Kullanıcı:
-
-"3000 kelime"
-
-derse kelime sayısının 3000 olduğunu hatırla.
-
-Önceki bilgilerle birlikte düşün:
-
-Kaynak = İngilizce
-Hedef = Türkçe
-Tür = Akademik
-Kelime = 3000
-
-Bu durumda kaynak dili, hedef dili veya metin türünü
-TEKRAR SORMA.
-
-Bunun yerine teslim tarihini sor:
-
-"Anladım. Çevirinin teslim edilmesini istediğiniz bir tarih var mı?"
-
-8. Kullanıcı teslim tarihini de verdiyse artık gerekli bilgilerin
-tamamlandığını belirt ve "Teklif Al" bölümüne yönlendir.
-
-9. Her mesajda mümkünse yalnızca BİR soru sor.
-
-10. Kullanıcı fiyat sorarsa kesin veya uydurma bir fiyat verme.
-
-11. Kullanıcı teklif almak istediğini söylerse
-"Teklif Al" bölümünden iletişim bilgilerini bırakabileceğini söyle.
-
-12. Kullanıcı adını veya telefonunu konuşma içinde kendisi verirse
+10. Kullanıcı adını veya telefonunu kendisi verdiyse
 tekrar isteme.
 
-13. Gereksiz kişisel bilgi isteme.
+11. Kısa cevaplar ver.
 
-14. Kullanıcıyla konuşurken önceki mesajları dikkate al.
-
-15. Kısa cevaplar ver.
-
-ŞİMDİ AŞAĞIDAKİ KONUŞMA GEÇMİŞİNİ DİKKATLİCE İNCELE.
+Şimdi konuşma geçmişini ve kullanıcının son mesajını
+dikkatlice değerlendir.
 """
 
-        # Konuşma geçmişini açık ve düzenli şekilde ekle
+        # -------------------------------------------------
+        # GEÇMİŞİ GEMINI'YE GÖNDER
+        # -------------------------------------------------
+
         if conversation_history:
 
             prompt += "\n\n--- KONUŞMA GEÇMİŞİ ---\n"
@@ -121,44 +214,47 @@ tekrar isteme.
             for item in conversation_history:
 
                 role = item.get("role", "")
-                content = item.get("content", "")
+                content = item.get("content", "").strip()
 
                 if not content:
                     continue
 
                 if role == "user":
-                    prompt += f"KULLANICI: {content}\n"
+
+                    prompt += (
+                        f"KULLANICI: {content}\n"
+                    )
 
                 elif role == "assistant":
-                    prompt += f"ASİSTAN: {content}\n"
+
+                    prompt += (
+                        f"ASİSTAN: {content}\n"
+                    )
 
             prompt += "\n--- KONUŞMA GEÇMİŞİ SONU ---\n"
 
-
         prompt += f"""
 
-KULLANICININ ŞU ANKİ MESAJI:
+KULLANICININ SON MESAJI:
 
 {user_message}
 
 ÖNEMLİ:
 
-Önce konuşma geçmişini incele.
+Önceki konuşmada verilmiş bilgileri tekrar sorma.
 
-Kullanıcının daha önce verdiği bilgileri çıkar.
-
-Bu bilgilerden hiçbirini tekrar sorma.
+Kullanıcının ihtiyacını dikkate al.
 
 Eksik olan en önemli bilgiyi belirle.
 
-Mümkünse yalnızca BİR soru sor.
+Mümkünse yalnızca bir soru sor.
 
-Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
-"Teklif Al" bölümüne yönlendir.
-
-Şimdi kullanıcıya doğal ve kısa bir Türkçe cevap ver.
+Kısa ve doğal Türkçe cevap ver.
 """
 
+        # -------------------------------------------------
+        # GEMINI
+        # -------------------------------------------------
 
         try:
 
@@ -171,16 +267,15 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
 
                 return response.text.strip()
 
-            return (
-                "Anladım. Çeviri talebinizle ilgili "
-                "bir sonraki bilgiyi paylaşabilir misiniz?"
+            return self.fallback_response(
+                user_message
             )
-
 
         except Exception as error:
 
             print(
-                f"Gemini API Error: {type(error).__name__}: {error}",
+                f"Gemini API Error: "
+                f"{type(error).__name__}: {error}",
                 flush=True
             )
 
@@ -189,6 +284,9 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
                 conversation_history
             )
 
+    # -----------------------------------------------------
+    # LEAD KAYDET
+    # -----------------------------------------------------
 
     def save_lead(self, name, phone, message):
 
@@ -201,17 +299,15 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
             message=message
         )
 
+    # -----------------------------------------------------
+    # FALLBACK
+    # -----------------------------------------------------
 
     def context_fallback(
         self,
         user_message,
         conversation_history=None
     ):
-
-        """
-        Gemini geçici olarak hata verirse bile
-        konuşmanın mantığını koruyan basit fallback.
-        """
 
         history = conversation_history or []
 
@@ -225,8 +321,6 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
 
         text = combined.lower()
 
-
-        # Kelime sayısı verildiyse teslim tarihini sor
         if any(
             word in text
             for word in [
@@ -243,8 +337,6 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
                 "bir tarih var mı?"
             )
 
-
-        # Çeviri bilgileri varsa kelime sayısını sor
         if (
             "ingilizce" in text
             and "türkçe" in text
@@ -259,7 +351,6 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
                 "çeviri için metniniz yaklaşık kaç kelime "
                 "veya kaç sayfa?"
             )
-
 
         if any(
             word in text
@@ -276,7 +367,6 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
                 "ve teslim süresini öğrenmemiz gerekiyor."
             )
 
-
         return (
             "Merhaba! 👋 Ben Transilation'ın Akıllı Satış "
             "Asistanıyım. Çeviri ihtiyacınızı belirlemenize "
@@ -284,6 +374,9 @@ Eğer gerekli bilgiler tamamlandıysa kullanıcıyı
             "Nasıl bir çeviriye ihtiyacınız var?"
         )
 
+    # -----------------------------------------------------
+    # BASİT FALLBACK
+    # -----------------------------------------------------
 
     def fallback_response(self, user_message):
 

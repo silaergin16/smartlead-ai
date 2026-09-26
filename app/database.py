@@ -3,8 +3,11 @@ import sqlite3
 
 
 BASE_DIR = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
 )
+
 
 DATABASE_PATH = os.path.join(
     BASE_DIR,
@@ -18,7 +21,16 @@ def get_connection():
     return connection
 
 
-def init_db():
+def close_db(error=None):
+    """
+    Flask uygulaması kapatılırken veritabanı bağlantısını kapatır.
+    Bu sürümde bağlantılar doğrudan kapatıldığı için ayrıca
+    kapatılacak global bir bağlantı bulunmamaktadır.
+    """
+    return None
+
+
+def init_db(app=None):
     connection = get_connection()
 
     connection.execute("""
@@ -38,42 +50,62 @@ def init_db():
 def create_lead(name, phone, message):
     connection = get_connection()
 
-    cursor = connection.execute(
-        """
-        INSERT INTO leads (name, phone, message)
-        VALUES (?, ?, ?)
-        """,
-        (name, phone, message)
-    )
+    try:
+        cursor = connection.execute(
+            """
+            INSERT INTO leads (
+                name,
+                phone,
+                message
+            )
+            VALUES (?, ?, ?)
+            """,
+            (
+                name,
+                phone,
+                message
+            )
+        )
 
-    connection.commit()
-    lead_id = cursor.lastrowid
-    connection.close()
+        connection.commit()
 
-    return lead_id
+        return cursor.lastrowid
+
+    finally:
+        connection.close()
 
 
 def get_leads():
     connection = get_connection()
 
-    leads = connection.execute(
-        """
-        SELECT id, name, phone, message, created_at
-        FROM leads
-        ORDER BY created_at DESC
-        """
-    ).fetchall()
+    try:
+        leads = connection.execute(
+            """
+            SELECT
+                id,
+                name,
+                phone,
+                message,
+                created_at
+            FROM leads
+            ORDER BY created_at DESC
+            """
+        ).fetchall()
 
-    connection.close()
+        return [dict(lead) for lead in leads]
 
-    return [dict(lead) for lead in leads]
-
-
-def lead_ekle(isim, telefon, mesaj=""):
-    return create_lead(isim, telefon, mesaj)
+    finally:
+        connection.close()
 
 
 def tum_leadler():
+    """
+    Lead kayıtlarını routes.py'nin beklediği
+    Türkçe alan adlarıyla döndürür.
+    """
+
+    leads = get_leads()
+
     return [
         {
             "id": lead["id"],
@@ -82,5 +114,9 @@ def tum_leadler():
             "mesaj": lead["message"],
             "tarih": lead["created_at"],
         }
-        for lead in get_leads()
+        for lead in leads
     ]
+
+
+# Eski kodlarla uyumluluk
+lead_ekle = create_lead

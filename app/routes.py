@@ -1,4 +1,3 @@
-```python
 import logging
 
 from flask import (
@@ -34,33 +33,18 @@ def _serialize_lead(lead):
 
 
 def dashboard_auth_required():
-    """
-    Dashboard ve lead listesini korumak için
-    HTTP Basic Authentication kontrolü.
-    """
-
     auth = request.authorization
 
     if not auth:
         return False
 
-    username_ok = (
-        auth.username == Config.ADMIN_USERNAME
-    )
-
-    password_ok = (
-        auth.password == Config.ADMIN_PASSWORD
-    )
+    username_ok = auth.username == Config.ADMIN_USERNAME
+    password_ok = auth.password == Config.ADMIN_PASSWORD
 
     return username_ok and password_ok
 
 
 def unauthorized_response():
-    """
-    Tarayıcıda kullanıcı adı ve şifre isteyen
-    Basic Authentication ekranını gösterir.
-    """
-
     return Response(
         "Dashboard erişimi için giriş yapmanız gerekiyor.",
         401,
@@ -83,7 +67,6 @@ def assistant():
 
 @bp.route("/dashboard", methods=["GET"])
 def dashboard():
-
     if not dashboard_auth_required():
         return unauthorized_response()
 
@@ -100,7 +83,6 @@ def dashboard():
 
 @bp.route("/health", methods=["GET"])
 def health():
-
     return jsonify({
         "status": "ok",
         "service": "Transilation Smart Sales Assistant",
@@ -110,14 +92,12 @@ def health():
 
 @bp.route("/api/sohbet", methods=["POST"])
 def sohbet():
-
     data = request.get_json(silent=True) or {}
 
     mesaj = data.get("mesaj") or data.get("message", "")
     gecmis = data.get("gecmis") or data.get("history", [])
 
     if not isinstance(mesaj, str) or not mesaj.strip():
-
         return jsonify({
             "basari": False,
             "success": False,
@@ -129,7 +109,6 @@ def sohbet():
         gecmis = []
 
     try:
-
         cevap = ai_service.yanit_uret(
             mesaj.strip(),
             gecmis
@@ -143,7 +122,6 @@ def sohbet():
         }), 200
 
     except AIServiceError as error:
-
         logger.exception(
             "AIServiceError in /api/sohbet"
         )
@@ -156,7 +134,6 @@ def sohbet():
         }), 503
 
     except Exception as error:
-
         logger.exception(
             "Unexpected error in /api/sohbet"
         )
@@ -172,7 +149,6 @@ def sohbet():
 
 @bp.route("/api/leads", methods=["POST"])
 def create_lead():
-
     data = request.get_json(silent=True) or {}
 
     isim = data.get("isim") or data.get("name", "")
@@ -185,7 +161,6 @@ def create_lead():
         or not isinstance(telefon, str)
         or not telefon.strip()
     ):
-
         return jsonify({
             "basari": False,
             "success": False,
@@ -194,7 +169,6 @@ def create_lead():
         }), 400
 
     try:
-
         lead_id = lead_ekle(
             isim.strip(),
             telefon.strip(),
@@ -211,7 +185,6 @@ def create_lead():
         }), 201
 
     except Exception as error:
-
         logger.exception(
             "Database error in POST /api/leads"
         )
@@ -227,14 +200,10 @@ def create_lead():
 
 @bp.route("/api/leads", methods=["GET"])
 def get_leads():
-
-    # Lead listesini dışarıya açık bırakmıyoruz.
-    # Sadece admin kullanıcı adı/şifresi ile erişilebilir.
     if not dashboard_auth_required():
         return unauthorized_response()
 
     try:
-
         leads = [
             _serialize_lead(lead)
             for lead in tum_leadler()
@@ -248,7 +217,6 @@ def get_leads():
         }), 200
 
     except Exception as error:
-
         logger.exception(
             "Database error in GET /api/leads"
         )
@@ -260,4 +228,3 @@ def get_leads():
             "error": "An error occurred while retrieving leads.",
             "detail": str(error),
         }), 500
-```

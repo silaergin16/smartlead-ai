@@ -1,12 +1,15 @@
-import re
-import unicodedata
+
 import logging
+import re
+import time
+import unicodedata
 
 from google import genai
 from config import Config
 from app.database import create_lead
 
 logger = logging.getLogger(__name__)
+
 
 class AIServiceError(Exception):
     pass
@@ -16,77 +19,78 @@ class AIService:
     def __init__(self):
         self.api_key = Config.GEMINI_API_KEY
         self.client = None
+        self.model = getattr(
+            Config,
+            "GEMINI_MODEL",
+            "gemini-2.5-flash"
+        )
 
-        if self.api_key:
-            try:
-                self.client = genai.Client(
-                    api_key=self.api_key
-                )
-            except Exception as error:
-                logger.exception(
-                    "[AI][GEMINI_REQUEST_FAILED] "
-                    "model=gemini-3.8-flash"
-                    "error_type=%s error=%s",
-                    type(error).__name__,
-                    str(error),
-                )
+        if not self.api_key:
+            logger.error(
+                "[AI][CLIENT_UNAVAILABLE] GEMINI_API_KEY tanımlı değil."
+            )
+            return
 
-                raise AIServiceError(
-                    f"Gemini isteği başarısız: "
-                    f"{type(error).__name__}: {error}"
-                ) from error
-                
+        try:
+            self.client = genai.Client(api_key=self.api_key)
+            logger.info(
+                "[AI][CLIENT_READY] Gemini istemcisi hazır. model=%s",
+                self.model
+            )
+        except Exception:
+            logger.exception("[AI][CLIENT_INIT_FAILED]")
+            self.client = None
+
+    # --------------------------------------------------
+    # METİN NORMALİZASYONU
+    # --------------------------------------------------
+
     def normalize_text(self, text):
         if not isinstance(text, str):
             return ""
 
-        text = text.replace("İ", "i")
-        text = text.replace("I", "ı")
         text = unicodedata.normalize("NFC", text)
+        return text.replace("İ", "i").replace("I", "ı").lower()
 
-        return text.lower()
+    # --------------------------------------------------
+    # ANA YANIT FONKSİYONU
+    # --------------------------------------------------
 
     def yanit_uret(self, user_message, conversation_history=None):
-        return self.get_response(
-            user_message,
-            conversation_history
-        )
+        return self.get_response(user_message, conversation_history)
 
     def get_response(self, user_message, conversation_history=None):
-        conversation_history = conversation_history or []
+        history = (
+            conversation_history
+            if isinstance(conversation_history, list)
+            else []
+        )
 
-        if not isinstance(user_message, str):
-            raise AIServiceError("Geçersiz kullanıcı mesajı.")
+        if not isinstance(user_message, str) or not user_message.strip():
+            raise AIServiceError("Kullanıcı mesajı boş veya geçersiz.")
 
         user_message = user_message.strip()
 
-        if not user_message:
-            raise AIServiceError("Kullanıcı mesajı boş.")
-
+        # Geçmiş konuşmaları birleştir.
         previous_messages = []
 
-        for item in conversation_history:
+        for item in history:
             if not isinstance(item, dict):
                 continue
 
-            content = item.get("content", "")
+            content = item.get("content", item.get("mesaj", ""))
 
             if isinstance(content, str) and content.strip():
                 previous_messages.append(content.strip())
 
-        previous_messages.append(user_message)
-
         full_text = self.normalize_text(
-            " ".join(previous_messages)
+            " ".join(previous_messages + [user_message])
         )
 
-        # --------------------------------------------------
-        # KELİME / SAYFA BİLGİSİ
-        # --------------------------------------------------
-
+        # Kelime / sayfa sayısı
         has_quantity = bool(
             re.search(
-                r"\b\d[\d.,]*\s*(kelime\w*|word\w*|sayfa\w*|page\w*)\b",
+                r"\b\d[\d.,]*\s*(?:kelime\w*|word\w*|sayfa\w*|page\w*)\b",
                 full_text
             )
         )
@@ -99,21 +103,17 @@ class AIService:
         ]
 
         has_quantity = has_quantity or any(
-            quantity in full_text
-            for quantity in quantity_ranges
+            item in full_text for item in quantity_ranges
         )
 
-        # --------------------------------------------------
-        # TESLİM TARİHİ
-        # --------------------------------------------------
-
+        # Teslim tarihi
         delivery_patterns = [
             r"\b\d+\s*gün\b",
             r"\b\d+\s*hafta\b",
             r"\byarın\b",
             r"\bbugün\b",
             r"\bhaftaya\b",
-            r"\bbu hafta\b",
+            r"\bb u hafta\b",
             r"\bgelecek hafta\b",
             r"\bcuma\b",
             r"\bcumartesi\b",
@@ -131,71 +131,30 @@ class AIService:
             "acil teslim",
         ]
 
-        has_delivery_date = any(
-            re.search(pattern, full_text)
-            for pattern in delivery_patterns
-        ) or any(
-            option in full_text
-            for option in delivery_options
+        has_delivery_date = (
+            any(re.search(p, full_text) for p in delivery_patterns)
+            or any(item in full_text for item in delivery_options)
         )
 
-        # --------------------------------------------------
-        # KAYNAK DİL
-        # --------------------------------------------------
-
+        # Diller
         has_english = bool(
-            re.search(
-                r"\bingilizce\w*\b|\benglish\w*\b",
-                full_text
-            )
+            re.search(r"\bingilizce\w*\b|\benglish\w*\b", full_text)
         )
-
-        # --------------------------------------------------
-        # HEDEF DİL
-        # --------------------------------------------------
-
         has_turkish = bool(
-            re.search(
-                r"\btürkçe\w*\b|\bturkish\w*\b",
-                full_text
-            )
+            re.search(r"\btürkçe\w*\b|\bturkish\w*\b", full_text)
         )
+        has_source_target = has_english and has_turkish
 
-        has_source_target = (
-            has_english
-            and has_turkish
-        )
-
-        # --------------------------------------------------
-        # METİN TÜRÜ
-        # --------------------------------------------------
-
+        # Metin türü
         text_types = [
-            "akademik",
-            "hukuki",
-            "teknik",
-            "edebi",
-            "edebî",
-            "ticari",
-            "makale",
-            "tez",
-            "belge",
-            "doküman",
-            "döküman",
-            "academic",
-            "article",
-            "paper",
+            "akademik", "hukuki", "teknik", "edebi", "edebî",
+            "ticari", "makale", "tez", "belge", "doküman",
+            "döküman", "academic", "article", "paper",
         ]
 
-        has_text_type = any(
-            word in full_text
-            for word in text_types
-        )
+        has_text_type = any(item in full_text for item in text_types)
 
-        # --------------------------------------------------
-        # BÜTÜN BİLGİLER TAMAM
-        # --------------------------------------------------
-
+        # Bilgiler tamamlandıysa sonraki adıma yönlendir.
         if (
             has_source_target
             and has_text_type
@@ -203,31 +162,12 @@ class AIService:
             and has_delivery_date
         ):
             return (
-                "Harika! Çeviri yönü, metin türü, metin uzunluğu "
-                "ve teslim süresini aldım. Size özel teklif almak "
-                'için "Teklif Al" bölümünden iletişim bilgilerinizi '
-                "bırakabilirsiniz."
+                "Harika! Çeviri yönünü, metin türünü, uzunluğunu "
+                "ve teslim süresini aldım. Size özel teklif için "
+                '"Teklif Al" bölümünden iletişim bilgilerinizi bırakabilirsiniz.'
             )
 
-        # --------------------------------------------------
-        # DİL + AKADEMİK VAR, UZUNLUK YOK
-        # --------------------------------------------------
-
-        if (
-            has_source_target
-            and has_text_type
-            and not has_quantity
-        ):
-            return (
-                "Harika! İngilizce → Türkçe akademik çeviri için "
-                "metniniz yaklaşık kaç kelime veya kaç sayfa?"
-            )
-
-        # --------------------------------------------------
-        # DİL + AKADEMİK + UZUNLUK VAR
-        # TESLİM TARİHİ YOK
-        # --------------------------------------------------
-
+        # Dil, metin türü ve uzunluk var; teslim tarihi eksik.
         if (
             has_source_target
             and has_text_type
@@ -235,330 +175,209 @@ class AIService:
             and not has_delivery_date
         ):
             return (
-                "Harika! İngilizce → Türkçe akademik çeviri "
-                "talebinizi ve metin uzunluğunu aldım. "
+                "Çeviri yönünü, metin türünü ve uzunluğunu aldım. "
                 "Çevirinin teslim edilmesini istediğiniz tarih nedir?"
             )
 
-        # --------------------------------------------------
-        # DİL + UZUNLUK VAR, METİN TÜRÜ YOK
-        # --------------------------------------------------
+        # Dil ve metin türü var; uzunluk eksik.
+        if (
+            has_source_target
+            and has_text_type
+            and not has_quantity
+        ):
+            return (
+                "İngilizce → Türkçe çeviri talebinizi aldım. "
+                "Metniniz yaklaşık kaç kelime veya kaç sayfa?"
+            )
 
+        # Dil ve uzunluk var; metin türü eksik.
         if (
             has_source_target
             and has_quantity
             and not has_text_type
         ):
             return (
-                "Anladım. İngilizce → Türkçe çeviri talebinizi "
-                "ve metin uzunluğunu not aldım. Metnin türü nedir?"
+                "İngilizce → Türkçe çeviri talebinizi ve uzunluğu "
+                "not aldım. Metninizin türü nedir?"
             )
 
-        # --------------------------------------------------
-        # METİN TÜRÜ + UZUNLUK VAR, DİL YOK
-        # --------------------------------------------------
-
+        # Metin türü ve uzunluk var; dil bilgisi eksik.
         if (
             has_text_type
             and has_quantity
             and not has_source_target
         ):
             return (
-                "Anladım. Metninizin yaklaşık uzunluğunu ve "
-                "türünü not aldım. Çeviri hangi dilden hangi "
-                "dile yapılacak?"
+                "Metninizin türünü ve uzunluğunu not aldım. "
+                "Hangi dilden hangi dile çevrilmesini istiyorsunuz?"
             )
 
-        # --------------------------------------------------
-        # GEMINI YOKSA FALLBACK
-        # --------------------------------------------------
-
+        # Gemini kullanılamıyorsa gerçek hatayı gizleme.
         if not self.client:
-            logger.error(
-                "[AI][CLIENT_UNAVAILABLE] Gemini istemcisi başlatılmamış. "
-                "GEMINI_API_KEY tanımlı mı kontrol edin."
+            raise AIServiceError(
+                "Gemini istemcisi hazır değil. Render ortamında "
+                "GEMINI_API_KEY ayarını ve başlangıç loglarını kontrol edin."
             )
 
-            raise AIServiceError(
-                "Gemini istemcisi başlatılamadı. "
-                "Render ortam değişkenlerini ve başlangıç loglarını kontrol edin."
-            )
         # --------------------------------------------------
         # GEMINI PROMPT
         # --------------------------------------------------
 
-        prompt = Config.BUSINESS_CONTEXT + """
-
+        prompt_parts = [
+            str(getattr(Config, "BUSINESS_CONTEXT", "") or ""),
+            """
 Sen Transilation'ın Akıllı Satış Asistanısın.
 
-Görevin kullanıcının çeviri ihtiyacını anlamasına ve teklif
-sürecine yönlendirilmesine yardımcı olmaktır.
+Görevin müşterinin çeviri ihtiyacını anlamak ve teklif sürecine
+yardımcı olmaktır.
 
 Kurallar:
+- Türkçe, doğal, nazik ve profesyonel konuş.
+- Kullanıcının son mesajına doğrudan cevap ver.
+- Önceki mesajlarda verilmiş bilgileri tekrar sorma.
+- Kaynak dili, hedef dili, metin türünü, uzunluğu ve teslim
+  tarihini konuşma boyunca takip et.
+- Birden fazla bilgi verilmişse hepsini dikkate al.
+- Eksik olan en önemli bilgiyi sor; mümkünse tek soru sor.
+- Kullanıcı yalnızca selam verirse selamını doğal biçimde karşıla.
+- Fiyat sorulursa doğrulanmamış fiyat uydurma.
+- Bilgiler tamamlandığında kullanıcıyı "Teklif Al" bölümüne yönlendir.
+- Kısa, açık ve doğal yanıtlar ver.
+""",
+        ]
 
-1. Türkçe, doğal, kısa ve profesyonel konuş.
-2. Önceki mesajlarda verilen bilgileri hatırla.
-3. Daha önce verilen bilgileri tekrar sorma.
-4. Kaynak dil, hedef dil, metin türü, kelime/sayfa sayısı
-   ve teslim tarihini takip et.
-5. Kullanıcı aynı mesajda birden fazla bilgi verdiyse
-   hepsini dikkate al.
-6. Gereksiz soru sorma.
-7. Mümkünse yalnızca bir soru sor.
-8. Fiyat sorulursa kesin veya uydurma fiyat verme.
-9. Gerekli bilgiler tamamlandığında kullanıcıyı
-   "Teklif Al" bölümüne yönlendir.
-10. Kısa cevaplar ver.
-"""
+        if history:
+            history_lines = []
 
-        if conversation_history:
-            prompt += "\n--- KONUŞMA GEÇMİŞİ ---\n"
-
-            for item in conversation_history:
+            for item in history:
                 if not isinstance(item, dict):
                     continue
 
                 role = item.get("role", "")
-                content = item.get("content", "")
+                content = item.get("content", item.get("mesaj", ""))
 
-                if not isinstance(content, str):
-                    continue
-
-                content = content.strip()
-
-                if not content:
+                if not isinstance(content, str) or not content.strip():
                     continue
 
                 if role == "user":
-                    prompt += f"KULLANICI: {content}\n"
-
+                    history_lines.append(f"KULLANICI: {content.strip()}")
                 elif role == "assistant":
-                    prompt += f"ASİSTAN: {content}\n"
+                    history_lines.append(f"ASİSTAN: {content.strip()}")
 
-            prompt += "\n--- KONUŞMA GEÇMİŞİ SONU ---\n"
+            if history_lines:
+                prompt_parts.append(
+                    "ÖNCEKİ KONUŞMA:\n" + "\n".join(history_lines)
+                )
 
-        prompt += f"""
-
-KULLANICININ SON MESAJI:
-
-{user_message}
-
-Önceki konuşmada verilmiş bilgileri tekrar sorma.
-
-Eksik olan en önemli bilgiyi belirle.
-
-Mümkünse yalnızca bir soru sor.
-
-Kısa ve doğal Türkçe cevap ver.
-"""
-
-        try:
-            response = self.client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=prompt
-            )
-
-            if response and response.text:
-                return response.text.strip()
-
-            return self.context_fallback(
-                user_message,
-                conversation_history
-            )
-
-        except Exception as error:
-            print(
-                f"Gemini API Error: "
-                f"{type(error).__name__}: {error}",
-                flush=True
-            )
-
-            return self.context_fallback(
-                user_message,
-                conversation_history
-            )
-
-    # ------------------------------------------------------
-    # FALLBACK
-    # ------------------------------------------------------
-
-    def context_fallback(
-        self,
-        user_message,
-        conversation_history=None
-    ):
-        history = conversation_history or []
-
-        combined_parts = []
-
-        for item in history:
-            if not isinstance(item, dict):
-                continue
-
-            content = item.get("content", "")
-
-            if isinstance(content, str) and content.strip():
-                combined_parts.append(content.strip())
-
-        combined_parts.append(user_message)
-
-        text = self.normalize_text(
-            " ".join(combined_parts)
+        prompt_parts.append(
+            f"KULLANICININ SON MESAJI:\n{user_message}\n\n"
+            "Önceki bilgileri tekrar sorma. Son mesaja uygun yanıt ver."
         )
 
-        # Kelime / sayfa
-        has_quantity = bool(
-            re.search(
-                r"\b\d[\d.,]*\s*(kelime\w*|word\w*|sayfa\w*|page\w*)\b",
-                text
-            )
-        )
-
-        has_quantity = has_quantity or any(
-            quantity in text
-            for quantity in [
-                "1.000 kelimeden az",
-                "1.000 - 5.000 kelime",
-                "5.000 - 10.000 kelime",
-                "10.000+ kelime",
-            ]
-        )
-
-        # Diller
-        has_english = bool(
-            re.search(
-                r"\bingilizce\w*\b|\benglish\w*\b",
-                text
-            )
-        )
-
-        has_turkish = bool(
-            re.search(
-                r"\btürkçe\w*\b|\bturkish\w*\b",
-                text
-            )
-        )
-
-        # Çeviri
-        has_translation = any(
-            word in text
-            for word in [
-                "çeviri",
-                "çevir",
-                "çevirmek",
-                "translate",
-                "translation",
-            ]
-        )
-
-        # Akademik
-        has_academic = any(
-            word in text
-            for word in [
-                "akademik",
-                "makale",
-                "tez",
-                "academic",
-                "article",
-                "paper",
-            ]
-        )
+        prompt = "\n\n".join(prompt_parts)
 
         # --------------------------------------------------
-        # İNGİLİZCE → TÜRKÇE + AKADEMİK + UZUNLUK
+        # GEMINI İSTEĞİ VE GEÇİCİ HATALARDA TEKRAR DENEME
         # --------------------------------------------------
 
-        if (
-            has_english
-            and has_turkish
-            and has_academic
-            and has_quantity
-        ):
+        for attempt in range(3):
+            try:
+                logger.info(
+                    "[AI][REQUEST] model=%s attempt=%s message_length=%s history_count=%s",
+                    self.model,
+                    attempt + 1,
+                    len(user_message),
+                    len(history),
+                )
+
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                )
+
+                answer = (
+                    response.text.strip()
+                    if response and response.text
+                    else ""
+                )
+
+                if not answer:
+                    raise AIServiceError(
+                        "Gemini boş yanıt döndürdü."
+                    )
+
+                logger.info(
+                    "[AI][SUCCESS] model=%s response_length=%s",
+                    self.model,
+                    len(answer),
+                )
+
+                return answer
+
+            except AIServiceError:
+                raise
+
+            except Exception as error:
+                error_text = str(error).lower()
+                transient = (
+                    "503" in error_text
+                    or "unavailable" in error_text
+                    or "high demand" in error_text
+                    or "429" in error_text
+                    or "resource_exhausted" in error_text
+                )
+
+                if transient and attempt < 2:
+                    wait_seconds = 2 ** (attempt + 1)
+
+                    logger.warning(
+                        "[AI][RETRY] attempt=%s wait_seconds=%s error=%s",
+                        attempt + 1,
+                        wait_seconds,
+                        str(error),
+                    )
+
+                    time.sleep(wait_seconds)
+                    continue
+
+                logger.exception(
+                    "[AI][REQUEST_FAILED] model=%s",
+                    self.model,
+                )
+
+                raise AIServiceError(
+                    f"Gemini yanıt üretemedi: {type(error).__name__}: {error}"
+                ) from error
+
+        raise AIServiceError(
+            "Gemini üç denemeden sonra yanıt üretemedi."
+        )
+
+    # --------------------------------------------------
+    # İSTEĞE BAĞLI FALLBACK
+    # Gemini hatalarında otomatik olarak kullanılmaz.
+    # --------------------------------------------------
+
+    def context_fallback(self, user_message, conversation_history=None):
+        text = self.normalize_text(user_message)
+
+        if any(word in text for word in ["çeviri", "çevir", "translate", "translation"]):
             return (
-                "Harika! İngilizce → Türkçe akademik "
-                "çeviri talebinizi ve metin uzunluğunu aldım. "
-                "Çevirinin teslim edilmesini istediğiniz tarih nedir?"
+                "Tabii, çeviri ihtiyacınızı birlikte belirleyelim. "
+                "Hangi dilden hangi dile çeviri yapmak istiyorsunuz?"
             )
-
-        # --------------------------------------------------
-        # İNGİLİZCE → TÜRKÇE + AKADEMİK
-        # --------------------------------------------------
-
-        if (
-            has_english
-            and has_turkish
-            and has_academic
-        ):
-            return (
-                "Harika! İngilizce → Türkçe akademik "
-                "çeviri talebinizi aldım. Metniniz "
-                "yaklaşık kaç kelime veya kaç sayfa?"
-            )
-
-        # --------------------------------------------------
-        # İNGİLİZCE → TÜRKÇE + UZUNLUK
-        # --------------------------------------------------
-
-        if (
-            has_english
-            and has_turkish
-            and has_quantity
-        ):
-            return (
-                "Anladım. İngilizce → Türkçe çeviri "
-                "talebinizi ve metin uzunluğunu not aldım. "
-                "Metnin türü nedir?"
-            )
-
-        # --------------------------------------------------
-        # ÇEVİRİ + UZUNLUK
-        # --------------------------------------------------
-
-        if (
-            has_translation
-            and has_quantity
-        ):
-            return (
-                "Anladım. Çeviri metninizin uzunluğunu "
-                "not aldım. Hangi dilden hangi dile "
-                "çeviri yapılacak?"
-            )
-
-        # --------------------------------------------------
-        # SADECE ÇEVİRİ
-        # --------------------------------------------------
-
-        if has_translation:
-            return (
-                "Tabii! Çeviri ihtiyacınızı belirleyelim. "
-                "Hangi dilden hangi dile çeviri yapmak "
-                "istiyorsunuz?"
-            )
-
-        # --------------------------------------------------
-        # GENEL KARŞILAMA
-        # --------------------------------------------------
 
         return (
-            "Merhaba! 👋 Ben Transilation'ın Akıllı Satış "
-            "Asistanıyım. Çeviri ihtiyacınızı belirlemenize "
-            "ve teklif sürecine yardımcı olabilirim. "
-            "Nasıl bir çeviriye ihtiyacınız var?"
+            "Mesajınızı aldım. Size doğru yardımcı olabilmem için "
+            "nasıl bir çeviri hizmetine ihtiyacınız olduğunu anlatabilir misiniz?"
         )
 
-    def fallback_response(
-        self,
-        user_message,
-        conversation_history=None
-    ):
-        return self.context_fallback(
-            user_message,
-            conversation_history
-        )
+    def fallback_response(self, user_message, conversation_history=None):
+        return self.context_fallback(user_message, conversation_history)
 
-    # ------------------------------------------------------
+    # --------------------------------------------------
     # LEAD KAYDI
-    # ------------------------------------------------------
+    # --------------------------------------------------
 
     def save_lead(self, name, phone, message):
         if not name or not phone:
@@ -567,12 +386,8 @@ Kısa ve doğal Türkçe cevap ver.
         return create_lead(
             name=name,
             phone=phone,
-            message=message
+            message=message,
         )
-
-
-    def yanit_uret(self, user_message, conversation_history=None):
-        return self.get_response(user_message, conversation_history)
 
 
 ai_service = AIService()

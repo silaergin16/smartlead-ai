@@ -25,7 +25,7 @@ class AIService:
             except Exception as error:
                 logger.exception(
                     "[AI][GEMINI_REQUEST_FAILED] "
-                    "model=gemini-2.5-flash "
+                    "model=gemini-3.8-flash"
                     "error_type=%s error=%s",
                     type(error).__name__,
                     str(error),

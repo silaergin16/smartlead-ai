@@ -13,10 +13,7 @@ def create_app():
 
     app.config.from_object(DevelopmentConfig)
 
-    CORS(
-        app,
-        origins="*"
-    )
+    CORS(app)
 
     from app.routes import main
     app.register_blueprint(main)

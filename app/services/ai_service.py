@@ -23,13 +23,19 @@ class AIService:
                     api_key=self.api_key
                 )
             except Exception as error:
-                print(
-                    f"Gemini client initialization error: "
-                    f"{type(error).__name__}: {error}",
-                    flush=True
+                logger.exception(
+                    "[AI][GEMINI_REQUEST_FAILED] "
+                    "model=gemini-2.5-flash "
+                    "error_type=%s error=%s",
+                    type(error).__name__,
+                    str(error),
                 )
-                self.client = None
 
+                raise AIServiceError(
+                    f"Gemini isteği başarısız: "
+                    f"{type(error).__name__}: {error}"
+                ) from error
+                
     def normalize_text(self, text):
         if not isinstance(text, str):
             return ""

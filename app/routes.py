@@ -90,22 +90,53 @@ def health():
     }), 200
 
 
+
 @bp.route("/api/sohbet", methods=["POST"])
 def sohbet():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+
+    logger.info(
+        "[CHAT][REQUEST] method=%s path=%s content_type=%s",
+        request.method,
+        request.path,
+        request.content_type,
+    )
+
+    if not isinstance(data, dict):
+        logger.error(
+            "[CHAT][INVALID_JSON] Gelen veri geçerli JSON nesnesi değil."
+        )
+        return jsonify({
+            "basari": False,
+            "success": False,
+            "hata": "Geçerli bir JSON nesnesi gönderilmedi.",
+            "error": "A valid JSON object is required.",
+        }), 400
 
     mesaj = data.get("mesaj") or data.get("message", "")
     gecmis = data.get("gecmis") or data.get("history", [])
 
+    # Hassas içerikleri terminale basmadan mesajın geldiğini doğrula.
+    logger.info(
+        "[CHAT][INPUT] mesaj_tipi=%s mesaj_uzunlugu=%s "
+        "gecmis_tipi=%s gecmis_adedi=%s",
+        type(mesaj).__name__,
+        len(mesaj) if isinstance(mesaj, str) else "gecersiz",
+        type(gecmis).__name__,
+        len(gecmis) if isinstance(gecmis, list) else "gecersiz",
+    )
+
     if not isinstance(mesaj, str) or not mesaj.strip():
+        logger.warning("[CHAT][VALIDATION] Boş veya geçersiz mesaj.")
         return jsonify({
             "basari": False,
             "success": False,
-            "hata": "Mesaj boş gönderildi",
-            "error": "Message cannot be empty",
+            "hata": "Mesaj boş gönderildi.",
+            "error": "Message cannot be empty.",
         }), 400
 
     if not isinstance(gecmis, list):
+        logger.warning("[CHAT][HISTORY] Geçersiz geçmiş; boş liste kullanılıyor.")
         gecmis = []
 
     try:
@@ -113,6 +144,21 @@ def sohbet():
             mesaj.strip(),
             gecmis
         )
+
+        logger.info(
+            "[CHAT][RESPONSE] cevap_tipi=%s cevap_uzunlugu=%s",
+            type(cevap).__name__,
+            len(cevap) if isinstance(cevap, str) else "gecersiz",
+        )
+
+        if not isinstance(cevap, str) or not cevap.strip():
+            logger.error("[CHAT][EMPTY_RESPONSE] AI boş yanıt üretti.")
+            return jsonify({
+                "basari": False,
+                "success": False,
+                "hata": "Asistan boş yanıt üretti.",
+                "error": "Assistant returned an empty response.",
+            }), 502
 
         return jsonify({
             "basari": True,
@@ -122,28 +168,23 @@ def sohbet():
         }), 200
 
     except AIServiceError as error:
-        logger.exception(
-            "AIServiceError in /api/sohbet"
-        )
+        logger.exception("[CHAT][AI_SERVICE_ERROR]")
 
         return jsonify({
             "basari": False,
             "success": False,
-            "hata": str(error),
+            "hata": "Yapay zekâ servisi yanıt üretemedi.",
             "error": str(error),
         }), 503
 
-    except Exception as error:
-        logger.exception(
-            "Unexpected error in /api/sohbet"
-        )
+    except Exception:
+        logger.exception("[CHAT][UNEXPECTED_ERROR]")
 
         return jsonify({
             "basari": False,
             "success": False,
-            "hata": "Sunucu tarafında beklenmeyen bir hata oluştu.",
-            "error": "An unexpected server error occurred.",
-            "detail": str(error),
+            "hata": "Sunucu tarafında beklenmeyen hata oluştu.",
+            "error": "Unexpected server error.",
         }), 500
 
 

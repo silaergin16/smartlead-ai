@@ -1,11 +1,12 @@
 import re
 import unicodedata
+import logging
 
 from google import genai
-
 from config import Config
 from app.database import create_lead
 
+logger = logging.getLogger(__name__)
 
 class AIServiceError(Exception):
     pass
@@ -267,11 +268,15 @@ class AIService:
         # --------------------------------------------------
 
         if not self.client:
-            return self.context_fallback(
-                user_message,
-                conversation_history
+            logger.error(
+                "[AI][CLIENT_UNAVAILABLE] Gemini istemcisi başlatılmamış. "
+                "GEMINI_API_KEY tanımlı mı kontrol edin."
             )
 
+            raise AIServiceError(
+                "Gemini istemcisi başlatılamadı. "
+                "Render ortam değişkenlerini ve başlangıç loglarını kontrol edin."
+            )
         # --------------------------------------------------
         # GEMINI PROMPT
         # --------------------------------------------------

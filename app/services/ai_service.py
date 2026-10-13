@@ -19,11 +19,13 @@ class AIService:
     def __init__(self):
         self.api_key = Config.GEMINI_API_KEY
         self.client = None
-        self.model = getattr(
-            Config,
-            "GEMINI_MODEL",
-            "gemini-2.5-flash"
-        )
+
+        # Önce en yeni Gemini 3 Flash modelini dene.
+        self.models = [
+            "gemini-3.8-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+        ]
 
         if not self.api_key:
             logger.error(
@@ -33,10 +35,7 @@ class AIService:
 
         try:
             self.client = genai.Client(api_key=self.api_key)
-            logger.info(
-                "[AI][CLIENT_READY] Gemini istemcisi hazır. model=%s",
-                self.model
-            )
+            logger.info("[AI][CLIENT_READY] Gemini istemcisi hazır.")
         except Exception:
             logger.exception("[AI][CLIENT_INIT_FAILED]")
             self.client = None
@@ -53,7 +52,7 @@ class AIService:
         return text.replace("İ", "i").replace("I", "ı").lower()
 
     # --------------------------------------------------
-    # ANA YANIT FONKSİYONU
+    # YANIT ÜRETİMİ
     # --------------------------------------------------
 
     def yanit_uret(self, user_message, conversation_history=None):
@@ -71,7 +70,8 @@ class AIService:
 
         user_message = user_message.strip()
 
-        # Geçmiş konuşmaları birleştir.
+        # Geçmiş konuşmaları topla.
+        history_lines = []
         previous_messages = []
 
         for item in history:
@@ -80,18 +80,27 @@ class AIService:
 
             content = item.get("content", item.get("mesaj", ""))
 
-            if isinstance(content, str) and content.strip():
-                previous_messages.append(content.strip())
+            if not isinstance(content, str) or not content.strip():
+                continue
+
+            content = content.strip()
+            previous_messages.append(content)
+
+            role = item.get("role", "")
+            if role == "user":
+                history_lines.append(f"KULLANICI: {content}")
+            elif role == "assistant":
+                history_lines.append(f"ASİSTAN: {content}")
 
         full_text = self.normalize_text(
             " ".join(previous_messages + [user_message])
         )
 
-        # Kelime / sayfa sayısı
+        # Kelime veya sayfa sayısı.
         has_quantity = bool(
             re.search(
-                r"\b\d[\d.,]*\s*(?:kelime\w*|word\w*|sayfa\w*|page\w*)\b",
-                full_text
+                r"\b\d[\d.,]*\s*(kelime\w*|word\w*|sayfa\w*|page\w*)\b",
+                full_text,
             )
         )
 
@@ -106,14 +115,14 @@ class AIService:
             item in full_text for item in quantity_ranges
         )
 
-        # Teslim tarihi
+        # Teslim tarihi.
         delivery_patterns = [
             r"\b\d+\s*gün\b",
             r"\b\d+\s*hafta\b",
             r"\byarın\b",
             r"\bbugün\b",
             r"\bhaftaya\b",
-            r"\bb u hafta\b",
+            r"\bbu hafta\b",
             r"\bgelecek hafta\b",
             r"\bcuma\b",
             r"\bcumartesi\b",
@@ -132,11 +141,11 @@ class AIService:
         ]
 
         has_delivery_date = (
-            any(re.search(p, full_text) for p in delivery_patterns)
-            or any(item in full_text for item in delivery_options)
+            any(re.search(pattern, full_text) for pattern in delivery_patterns)
+            or any(option in full_text for option in delivery_options)
         )
 
-        # Diller
+        # Dil bilgileri.
         has_english = bool(
             re.search(r"\bingilizce\w*\b|\benglish\w*\b", full_text)
         )
@@ -145,16 +154,27 @@ class AIService:
         )
         has_source_target = has_english and has_turkish
 
-        # Metin türü
+        # Metin türü.
         text_types = [
-            "akademik", "hukuki", "teknik", "edebi", "edebî",
-            "ticari", "makale", "tez", "belge", "doküman",
-            "döküman", "academic", "article", "paper",
+            "akademik",
+            "hukuki",
+            "teknik",
+            "edebi",
+            "edebî",
+            "ticari",
+            "makale",
+            "tez",
+            "belge",
+            "doküman",
+            "döküman",
+            "academic",
+            "article",
+            "paper",
         ]
 
         has_text_type = any(item in full_text for item in text_types)
 
-        # Bilgiler tamamlandıysa sonraki adıma yönlendir.
+        # Bilgiler tamamlandıysa teklif bölümüne yönlendir.
         if (
             has_source_target
             and has_text_type
@@ -162,8 +182,8 @@ class AIService:
             and has_delivery_date
         ):
             return (
-                "Harika! Çeviri yönünü, metin türünü, uzunluğunu "
-                "ve teslim süresini aldım. Size özel teklif için "
+                "Harika! Çeviri yönünü, metin türünü, uzunluğunu ve "
+                "teslim süresini aldım. Size özel teklif almak için "
                 '"Teklif Al" bölümünden iletişim bilgilerinizi bırakabilirsiniz.'
             )
 
@@ -197,7 +217,7 @@ class AIService:
             and not has_text_type
         ):
             return (
-                "İngilizce → Türkçe çeviri talebinizi ve uzunluğu "
+                "İngilizce → Türkçe çeviri talebinizi ve metin uzunluğunu "
                 "not aldım. Metninizin türü nedir?"
             )
 
@@ -212,15 +232,15 @@ class AIService:
                 "Hangi dilden hangi dile çevrilmesini istiyorsunuz?"
             )
 
-        # Gemini kullanılamıyorsa gerçek hatayı gizleme.
+        # Gemini istemcisi yoksa sabit karşılama mesajı döndürme.
         if not self.client:
             raise AIServiceError(
                 "Gemini istemcisi hazır değil. Render ortamında "
-                "GEMINI_API_KEY ayarını ve başlangıç loglarını kontrol edin."
+                "GEMINI_API_KEY ayarını kontrol edin."
             )
 
         # --------------------------------------------------
-        # GEMINI PROMPT
+        # PROMPT
         # --------------------------------------------------
 
         prompt_parts = [
@@ -228,140 +248,150 @@ class AIService:
             """
 Sen Transilation'ın Akıllı Satış Asistanısın.
 
-Görevin müşterinin çeviri ihtiyacını anlamak ve teklif sürecine
-yardımcı olmaktır.
+Görevin, kullanıcının çeviri ihtiyacını anlamak ve teklif
+sürecine yardımcı olmaktır.
 
 Kurallar:
 - Türkçe, doğal, nazik ve profesyonel konuş.
-- Kullanıcının son mesajına doğrudan cevap ver.
-- Önceki mesajlarda verilmiş bilgileri tekrar sorma.
+- Kullanıcının SON mesajına doğrudan cevap ver.
+- Önceki mesajlarda verilen bilgileri tekrar sorma.
 - Kaynak dili, hedef dili, metin türünü, uzunluğu ve teslim
   tarihini konuşma boyunca takip et.
-- Birden fazla bilgi verilmişse hepsini dikkate al.
+- Kullanıcı birden fazla bilgi verdiyse hepsini dikkate al.
 - Eksik olan en önemli bilgiyi sor; mümkünse tek soru sor.
-- Kullanıcı yalnızca selam verirse selamını doğal biçimde karşıla.
+- Kullanıcı selam verirse doğal bir selamla karşılık ver.
 - Fiyat sorulursa doğrulanmamış fiyat uydurma.
 - Bilgiler tamamlandığında kullanıcıyı "Teklif Al" bölümüne yönlendir.
 - Kısa, açık ve doğal yanıtlar ver.
 """,
         ]
 
-        if history:
-            history_lines = []
-
-            for item in history:
-                if not isinstance(item, dict):
-                    continue
-
-                role = item.get("role", "")
-                content = item.get("content", item.get("mesaj", ""))
-
-                if not isinstance(content, str) or not content.strip():
-                    continue
-
-                if role == "user":
-                    history_lines.append(f"KULLANICI: {content.strip()}")
-                elif role == "assistant":
-                    history_lines.append(f"ASİSTAN: {content.strip()}")
-
-            if history_lines:
-                prompt_parts.append(
-                    "ÖNCEKİ KONUŞMA:\n" + "\n".join(history_lines)
-                )
+        if history_lines:
+            prompt_parts.append(
+                "ÖNCEKİ KONUŞMA:\n" + "\n".join(history_lines)
+            )
 
         prompt_parts.append(
             f"KULLANICININ SON MESAJI:\n{user_message}\n\n"
-            "Önceki bilgileri tekrar sorma. Son mesaja uygun yanıt ver."
+            "Önceki bilgileri tekrar sorma. Son mesaja uygun cevap ver."
         )
 
         prompt = "\n\n".join(prompt_parts)
 
         # --------------------------------------------------
-        # GEMINI İSTEĞİ VE GEÇİCİ HATALARDA TEKRAR DENEME
+        # GEMINI 3 MODELLERİ
         # --------------------------------------------------
 
-        for attempt in range(3):
-            try:
-                logger.info(
-                    "[AI][REQUEST] model=%s attempt=%s message_length=%s history_count=%s",
-                    self.model,
-                    attempt + 1,
-                    len(user_message),
-                    len(history),
-                )
+        last_error = None
 
-                response = self.client.models.generate_content(
-                    model=self.model,
-                    contents=prompt,
-                )
-
-                answer = (
-                    response.text.strip()
-                    if response and response.text
-                    else ""
-                )
-
-                if not answer:
-                    raise AIServiceError(
-                        "Gemini boş yanıt döndürdü."
+        for model_name in self.models:
+            for attempt in range(2):
+                try:
+                    logger.info(
+                        "[AI][REQUEST] model=%s attempt=%s",
+                        model_name,
+                        attempt + 1,
                     )
 
-                logger.info(
-                    "[AI][SUCCESS] model=%s response_length=%s",
-                    self.model,
-                    len(answer),
-                )
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                    )
 
-                return answer
+                    answer = (
+                        response.text.strip()
+                        if response and response.text
+                        else ""
+                    )
 
-            except AIServiceError:
-                raise
+                    if not answer:
+                        raise AIServiceError(
+                            f"{model_name} boş yanıt döndürdü."
+                        )
 
-            except Exception as error:
-                error_text = str(error).lower()
-                transient = (
-                    "503" in error_text
-                    or "unavailable" in error_text
-                    or "high demand" in error_text
-                    or "429" in error_text
-                    or "resource_exhausted" in error_text
-                )
+                    logger.info(
+                        "[AI][SUCCESS] model=%s response_length=%s",
+                        model_name,
+                        len(answer),
+                    )
 
-                if transient and attempt < 2:
-                    wait_seconds = 2 ** (attempt + 1)
+                    return answer
+
+                except AIServiceError:
+                    raise
+
+                except Exception as error:
+                    last_error = error
+                    error_text = str(error).lower()
+
+                    temporary_error = any(
+                        marker in error_text
+                        for marker in [
+                            "503",
+                            "unavailable",
+                            "high demand",
+                            "429",
+                            "resource_exhausted",
+                            "404",
+                            "not_found",
+                            "not found",
+                        ]
+                    )
 
                     logger.warning(
-                        "[AI][RETRY] attempt=%s wait_seconds=%s error=%s",
+                        "[AI][MODEL_FAILED] model=%s attempt=%s "
+                        "temporary_or_model_error=%s error=%s",
+                        model_name,
                         attempt + 1,
-                        wait_seconds,
+                        temporary_error,
                         str(error),
                     )
 
-                    time.sleep(wait_seconds)
-                    continue
+                    # Yetkilendirme veya başka kalıcı hatalarda
+                    # diğer modelleri denemek sorunu çözmez.
+                    if any(
+                        marker in error_text
+                        for marker in [
+                            "401",
+                            "403",
+                            "unauthorized",
+                            "permission_denied",
+                            "invalid api key",
+                        ]
+                    ):
+                        raise AIServiceError(
+                            f"Gemini API erişim hatası: {error}"
+                        ) from error
 
-                logger.exception(
-                    "[AI][REQUEST_FAILED] model=%s",
-                    self.model,
-                )
+                    if attempt == 0:
+                        time.sleep(2)
 
-                raise AIServiceError(
-                    f"Gemini yanıt üretemedi: {type(error).__name__}: {error}"
-                ) from error
+                    # İkinci başarısız denemede sıradaki modeli dene.
+                    else:
+                        break
+
+        logger.error(
+            "[AI][ALL_MODELS_FAILED] Son hata: %s",
+            str(last_error),
+        )
 
         raise AIServiceError(
-            "Gemini üç denemeden sonra yanıt üretemedi."
-        )
+            "Gemini 3 modellerinin hiçbiri yanıt üretemedi. "
+            f"Son hata: {last_error}"
+        ) from last_error
 
     # --------------------------------------------------
     # İSTEĞE BAĞLI FALLBACK
-    # Gemini hatalarında otomatik olarak kullanılmaz.
+    # Gemini hatalarında otomatik kullanılmaz.
     # --------------------------------------------------
 
     def context_fallback(self, user_message, conversation_history=None):
         text = self.normalize_text(user_message)
 
-        if any(word in text for word in ["çeviri", "çevir", "translate", "translation"]):
+        if any(
+            word in text
+            for word in ["çeviri", "çevir", "translate", "translation"]
+        ):
             return (
                 "Tabii, çeviri ihtiyacınızı birlikte belirleyelim. "
                 "Hangi dilden hangi dile çeviri yapmak istiyorsunuz?"

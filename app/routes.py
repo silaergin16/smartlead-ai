@@ -1,3 +1,4 @@
+
 import logging
 
 from flask import (
@@ -5,10 +6,8 @@ from flask import (
     jsonify,
     render_template,
     request,
-    Response,
 )
 
-from config import Config
 from app.database import lead_ekle, tum_leadler
 from app.services.ai_service import AIServiceError, ai_service
 
@@ -32,18 +31,6 @@ def _serialize_lead(lead):
     }
 
 
-def dashboard_auth_required():
-    auth = request.authorization
-
-    if not auth:
-        return False
-
-    username_ok = auth.username == Config.ADMIN_USERNAME
-    password_ok = auth.password == Config.ADMIN_PASSWORD
-
-    return username_ok and password_ok
-
-
 @bp.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -56,18 +43,20 @@ def assistant():
 
 @bp.route("/dashboard", methods=["GET"])
 def dashboard():
-    if not dashboard_auth_required():
-        return unauthorized_response()
+    try:
+        leads = [
+            _serialize_lead(lead)
+            for lead in tum_leadler()
+        ]
 
-    leads = [
-        _serialize_lead(lead)
-        for lead in tum_leadler()
-    ]
+        return render_template(
+            "dashboard.html",
+            leads=leads
+        )
 
-    return render_template(
-        "dashboard.html",
-        leads=leads
-    )
+    except Exception:
+        logger.exception("Error handling GET /dashboard")
+        return "Yönetim paneli yüklenirken hata oluştu.", 500
 
 
 @bp.route("/health", methods=["GET"])
@@ -77,7 +66,6 @@ def health():
         "service": "Transilation Smart Sales Assistant",
         "durum": "canli",
     }), 200
-
 
 
 @bp.route("/api/sohbet", methods=["POST"])
@@ -92,9 +80,6 @@ def sohbet():
     )
 
     if not isinstance(data, dict):
-        logger.error(
-            "[CHAT][INVALID_JSON] Gelen veri geçerli JSON nesnesi değil."
-        )
         return jsonify({
             "basari": False,
             "success": False,
@@ -105,18 +90,7 @@ def sohbet():
     mesaj = data.get("mesaj") or data.get("message", "")
     gecmis = data.get("gecmis") or data.get("history", [])
 
-    # Hassas içerikleri terminale basmadan mesajın geldiğini doğrula.
-    logger.info(
-        "[CHAT][INPUT] mesaj_tipi=%s mesaj_uzunlugu=%s "
-        "gecmis_tipi=%s gecmis_adedi=%s",
-        type(mesaj).__name__,
-        len(mesaj) if isinstance(mesaj, str) else "gecersiz",
-        type(gecmis).__name__,
-        len(gecmis) if isinstance(gecmis, list) else "gecersiz",
-    )
-
     if not isinstance(mesaj, str) or not mesaj.strip():
-        logger.warning("[CHAT][VALIDATION] Boş veya geçersiz mesaj.")
         return jsonify({
             "basari": False,
             "success": False,
@@ -125,7 +99,6 @@ def sohbet():
         }), 400
 
     if not isinstance(gecmis, list):
-        logger.warning("[CHAT][HISTORY] Geçersiz geçmiş; boş liste kullanılıyor.")
         gecmis = []
 
     try:
@@ -134,14 +107,7 @@ def sohbet():
             gecmis
         )
 
-        logger.info(
-            "[CHAT][RESPONSE] cevap_tipi=%s cevap_uzunlugu=%s",
-            type(cevap).__name__,
-            len(cevap) if isinstance(cevap, str) else "gecersiz",
-        )
-
         if not isinstance(cevap, str) or not cevap.strip():
-            logger.error("[CHAT][EMPTY_RESPONSE] AI boş yanıt üretti.")
             return jsonify({
                 "basari": False,
                 "success": False,
@@ -194,8 +160,8 @@ def create_lead():
         return jsonify({
             "basari": False,
             "success": False,
-            "hata": "İsim ve telefon gerekli",
-            "error": "Name and phone are required",
+            "hata": "İsim ve telefon gerekli.",
+            "error": "Name and phone are required.",
         }), 400
 
     try:
@@ -214,25 +180,19 @@ def create_lead():
             "message": "Lead saved successfully.",
         }), 201
 
-    except Exception as error:
-        logger.exception(
-            "Database error in POST /api/leads"
-        )
+    except Exception:
+        logger.exception("Database error in POST /api/leads")
 
         return jsonify({
             "basari": False,
             "success": False,
             "hata": "Kayıt sırasında bir veritabanı hatası oluştu.",
             "error": "A database error occurred while saving the lead.",
-            "detail": str(error),
         }), 500
 
 
 @bp.route("/api/leads", methods=["GET"])
 def get_leads():
-    if not dashboard_auth_required():
-        return unauthorized_response()
-
     try:
         leads = [
             _serialize_lead(lead)
@@ -246,15 +206,12 @@ def get_leads():
             "data": leads,
         }), 200
 
-    except Exception as error:
-        logger.exception(
-            "Database error in GET /api/leads"
-        )
+    except Exception:
+        logger.exception("Database error in GET /api/leads")
 
         return jsonify({
             "basari": False,
             "success": False,
             "hata": "Kayıtlar çekilirken hata oluştu.",
             "error": "An error occurred while retrieving leads.",
-            "detail": str(error),
         }), 500

@@ -44,17 +44,6 @@ def dashboard_auth_required():
     return username_ok and password_ok
 
 
-def unauthorized_response():
-    return Response(
-        "Dashboard erişimi için giriş yapmanız gerekiyor.",
-        401,
-        {
-            "WWW-Authenticate": 'Basic realm="Transilation Admin"',
-            "Content-Type": "text/plain; charset=utf-8",
-        },
-    )
-
-
 @bp.route("/", methods=["GET"])
 def index():
     return render_template("index.html")

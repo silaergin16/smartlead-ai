@@ -1,3 +1,4 @@
+
 import os
 import sqlite3
 
@@ -7,7 +8,6 @@ BASE_DIR = os.path.dirname(
         os.path.abspath(__file__)
     )
 )
-
 
 DATABASE_PATH = os.path.join(
     BASE_DIR,
@@ -23,31 +23,55 @@ def get_connection():
 
 def close_db(error=None):
     """
-    Flask uygulaması kapatılırken veritabanı bağlantısını kapatır.
-    Bu sürümde bağlantılar doğrudan kapatıldığı için ayrıca
-    kapatılacak global bir bağlantı bulunmamaktadır.
+    Veritabanı bağlantıları işlem sonunda kapatıldığı
+    için ayrıca kapatılacak global bağlantı yoktur.
     """
     return None
 
 
 def init_db(app=None):
+    """
+    Tablo yoksa oluşturur.
+    Eski veritabanlarında email sütunu yoksa ekler.
+    Mevcut müşteri kayıtlarını silmez.
+    """
     connection = get_connection()
 
-    connection.execute("""
-        CREATE TABLE IF NOT EXISTS leads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            message TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+    try:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS leads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-    connection.commit()
-    connection.close()
+        columns = connection.execute(
+            "PRAGMA table_info(leads)"
+        ).fetchall()
+
+        column_names = [
+            column["name"] for column in columns
+        ]
+
+        if "email" not in column_names:
+            connection.execute(
+                "ALTER TABLE leads ADD COLUMN email TEXT"
+            )
+
+        connection.commit()
+
+    finally:
+        connection.close()
 
 
-def create_lead(name, phone, message):
+def create_lead(name, phone, message, email=None):
+    """
+    Yeni müşteri adayını isim, telefon, mesaj ve
+    e-posta bilgileriyle kaydeder.
+    """
     connection = get_connection()
 
     try:
@@ -56,14 +80,16 @@ def create_lead(name, phone, message):
             INSERT INTO leads (
                 name,
                 phone,
-                message
+                message,
+                email
             )
-            VALUES (?, ?, ?)
+            VALUES (?, ?, ?, ?)
             """,
             (
                 name,
                 phone,
-                message
+                message,
+                email
             )
         )
 
@@ -76,6 +102,9 @@ def create_lead(name, phone, message):
 
 
 def get_leads():
+    """
+    Müşteri adaylarını en yeniden en eskiye sıralar.
+    """
     connection = get_connection()
 
     try:
@@ -86,13 +115,16 @@ def get_leads():
                 name,
                 phone,
                 message,
+                email,
                 created_at
             FROM leads
             ORDER BY created_at DESC
             """
         ).fetchall()
 
-        return [dict(lead) for lead in leads]
+        return [
+            dict(lead) for lead in leads
+        ]
 
     finally:
         connection.close()
@@ -100,10 +132,9 @@ def get_leads():
 
 def tum_leadler():
     """
-    Lead kayıtlarını routes.py'nin beklediği
+    Kayıtları routes.py dosyasının beklediği
     Türkçe alan adlarıyla döndürür.
     """
-
     leads = get_leads()
 
     return [
@@ -112,11 +143,12 @@ def tum_leadler():
             "isim": lead["name"],
             "telefon": lead["phone"],
             "mesaj": lead["message"],
+            "email": lead["email"],
             "tarih": lead["created_at"],
         }
         for lead in leads
     ]
 
 
-# Eski kodlarla uyumluluk
+# Eski fonksiyon adlarıyla uyumluluk
 lead_ekle = create_lead

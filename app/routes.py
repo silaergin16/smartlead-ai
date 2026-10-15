@@ -23,6 +23,7 @@ def _serialize_lead(lead):
         "isim": lead["isim"],
         "telefon": lead["telefon"],
         "mesaj": lead["mesaj"],
+        "email": lead.get("email") or "",
         "tarih": lead["tarih"],
         "name": lead["isim"],
         "phone": lead["telefon"],
@@ -145,11 +146,20 @@ def sohbet():
 
 @bp.route("/api/leads", methods=["POST"])
 def create_lead():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "basari": False,
+            "success": False,
+            "hata": "Geçerli bir JSON nesnesi gönderilmedi.",
+            "error": "A valid JSON object is required.",
+        }), 400
 
     isim = data.get("isim") or data.get("name", "")
     telefon = data.get("telefon") or data.get("phone", "")
     mesaj = data.get("mesaj") or data.get("message", "")
+    email = data.get("email") or data.get("mail", "")
 
     if (
         not isinstance(isim, str)
@@ -164,11 +174,20 @@ def create_lead():
             "error": "Name and phone are required.",
         }), 400
 
+    if not isinstance(email, str):
+        return jsonify({
+            "basari": False,
+            "success": False,
+            "hata": "E-posta alanı geçersiz.",
+            "error": "Email field is invalid.",
+        }), 400
+
     try:
         lead_id = lead_ekle(
             isim.strip(),
             telefon.strip(),
-            str(mesaj)
+            str(mesaj),
+            email.strip() or None
         )
 
         return jsonify({
